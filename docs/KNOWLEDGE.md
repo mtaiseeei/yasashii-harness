@@ -151,9 +151,10 @@ Target repositories may already have `CLAUDE.md` or `AGENTS.md`. The plugin must
 Instead:
 
 - Claude Code uses `hooks/session-start.sh` to inject `using-harness` as temporary context.
+- The normal user flow is conversational: the user asks to build an app or substantial feature, `using-harness` detects the intent, initializes target guidance, and routes into `harness-loop`. `/harness` is an explicit shortcut, not the primary requirement.
 - Codex uses plugin-distributed skills and progressive disclosure.
 - `/harness` initialization may generate guidance files only when they do not already exist.
-- If guidance files exist, `/harness` writes `docs/harness-guidance.md` with a suggested block.
+- If custom guidance files exist, harness initialization writes `docs/harness-guidance.md` with a suggested block.
 
 ### Zero-Dependency By Default
 

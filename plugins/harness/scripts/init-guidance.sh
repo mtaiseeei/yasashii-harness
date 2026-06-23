@@ -15,10 +15,14 @@ touch "${TARGET_ROOT}/docs/spec.md"
 touch "${TARGET_ROOT}/docs/progress.md"
 
 created_any=false
-had_existing_guidance_target=false
+had_custom_guidance_target=false
 
-if [[ -e "${TARGET_ROOT}/CLAUDE.md" || -e "${TARGET_ROOT}/AGENTS.md" ]]; then
-    had_existing_guidance_target=true
+if [[ -e "${TARGET_ROOT}/CLAUDE.md" ]] && ! cmp -s "${PLUGIN_ROOT}/templates/CLAUDE.md" "${TARGET_ROOT}/CLAUDE.md"; then
+    had_custom_guidance_target=true
+fi
+
+if [[ -e "${TARGET_ROOT}/AGENTS.md" ]] && ! cmp -s "${PLUGIN_ROOT}/templates/AGENTS.md" "${TARGET_ROOT}/AGENTS.md"; then
+    had_custom_guidance_target=true
 fi
 
 copy_if_missing() {
@@ -36,7 +40,7 @@ copy_if_missing() {
 copy_if_missing "${PLUGIN_ROOT}/templates/CLAUDE.md" "${TARGET_ROOT}/CLAUDE.md"
 copy_if_missing "${PLUGIN_ROOT}/templates/AGENTS.md" "${TARGET_ROOT}/AGENTS.md"
 
-if [[ "$had_existing_guidance_target" == true ]]; then
+if [[ "$had_custom_guidance_target" == true ]]; then
     copy_if_missing "${PLUGIN_ROOT}/templates/docs/harness-guidance.md" "${TARGET_ROOT}/docs/harness-guidance.md"
 fi
 

@@ -2,7 +2,7 @@
 
 This repository can use Agentic Harness for substantial app or feature work. When the user asks to build an app, site, tool, or multi-step feature, prefer the harness loop instead of a single unstructured implementation pass.
 
-Start with:
+Normally, just ask Claude Code to build the app or feature. The harness entry skill should detect the request and start the loop. For explicit startup, use:
 
 ```text
 /harness <short product idea>

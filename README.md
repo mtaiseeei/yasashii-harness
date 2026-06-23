@@ -17,9 +17,10 @@ Claude Code / Codex 向けハーネス。GAN（敵対的生成ネットワーク
 ```
 
 インストール後、Claude Code では SessionStart フックが入口スキル（`using-harness`）を
-additionalContext として注入します。手動で始めるなら `/harness`。
+additionalContext として注入します。普段は「〇〇なアプリを作って」と普通に会話してください。
+明示的に始めたい場合だけ `/harness` を使います。
 
-After installing, run:
+After installing, just ask for what you want to build. You can also run:
 
 ```
 /harness your app idea
@@ -29,22 +30,35 @@ After installing, run:
 
 このリポジトリには Codex 用の repo marketplace も入っています。
 
+GitHub から追加する場合:
+
 ```
-codex plugin marketplace add .
+codex plugin marketplace add mtaiseeei/agentic-harness
 codex plugin add harness@agentic-harness-local
 ```
 
-Codex では `AGENTS.md` をプラグインから上書きせず、`using-harness` / `harness-loop` skill を
-暗黙または明示呼び出しで使います。手動で始めるなら `$using-harness` または `$harness-loop` を
-指定してください。
+ローカル checkout から追加する場合は、**この `agentic-harness` リポジトリの root** を指定します。
+取り込み先リポジトリで `.` を指定しないでください。
+
+```
+codex plugin marketplace add /absolute/path/to/agentic-harness
+codex plugin add harness@agentic-harness-local
+```
+
+すでに `agentic-harness-local` marketplace を追加済みなら、取り込み先リポジトリでは次だけで十分です。
+
+```
+codex plugin add harness@agentic-harness-local
+```
+
+Codex では `AGENTS.md` をプラグインから上書きせず、`using-harness` skill が会話から起動して、
+no-overwrite 初期化と `harness-loop` へ進みます。普段は「〇〇なアプリを作って」と普通に会話してください。
+明示的に始めたい場合だけ `/harness`、`$using-harness`、または `$harness-loop` を指定します。
 
 ## 使い方
 
-```
-/harness シンプルなTODOアプリ
-```
-
-または会話で「〇〇なアプリを作って」と言うだけ。あとはループが回ります。
+会話で「〇〇なアプリを作って」と言うだけで、入口 skill がハーネスを起動します。
+明示的に始めたい場合は `/harness シンプルなTODOアプリ` も使えます。
 
 1. **Planner** がアイデアを `docs/spec.md`（製品仕様）に展開
 2. **Generator** が 1スプリント＝1機能ずつ実装し、`docs/progress.md` に自己評価
@@ -65,9 +79,9 @@ Planner ──→ Generator ──→ Evaluator
 | `agents/planner.md` | 「何を作るか」だけを詳細仕様に展開。実装は決めない |
 | `agents/generator.md` | 1スプリントずつ実装＋自己評価。技術選定は自分で判断 |
 | `agents/evaluator.md` | 実際に動かしてテスト。閾値で合否判定 |
-| `skills/using-harness` | 入口。いつハーネスを使うかを判断 |
+| `skills/using-harness` | 通常入口。会話からハーネス利用を判断し、初期化して `harness-loop` に進む |
 | `skills/harness-loop` | オーケストレーションの脳。書き込み権限・閾値・絶対ルール・手順 |
-| `commands/harness.md` | `/harness` — docs雛形を用意してループ開始 |
+| `commands/harness.md` | `/harness` — 明示起動用ショートカット |
 | `hooks/` | Claude Code の SessionStart で `using-harness` を additionalContext として注入 |
 | `templates/` | 取り込み先リポジトリ用の `CLAUDE.md` / `AGENTS.md` no-overwrite テンプレート |
 | `.codex-plugin/plugin.json` | Codex 用プラグイン manifest |
@@ -107,15 +121,17 @@ Claude Desktop は Preview、CLI は Playwright に寄せます。
 ## CLAUDE.md / AGENTS.md と Hook の考え方
 
 このプラグインは install 時や Hook 実行時に `CLAUDE.md` / `AGENTS.md` を勝手に上書きしません。
-`/harness` 初期化時だけ、no-overwrite で生成します。仕組みは次の通りです。
+会話から Harness が起動した時、または `/harness` を明示実行した時だけ、no-overwrite で生成します。
+仕組みは次の通りです。
 
 1. **Claude Code:** `hooks/session-start.sh` が SessionStart 時に `skills/using-harness/SKILL.md` を読み、
    Claude Code 固有の `hookSpecificOutput.additionalContext` として返します。これは「一時的に会話へ
    入口説明を足す」だけで、リポジトリの `CLAUDE.md` は変更しません。
 2. **Codex:** Codex は plugin から `AGENTS.md` を上書きしません。代わりに `.codex-plugin/plugin.json`
    で `skills/` を配布し、Codex が skill の `name` / `description` を見て必要時に `SKILL.md` を読みます。
-3. **`/harness` 初期化:** 取り込み先に `CLAUDE.md` / `AGENTS.md` が無ければ `templates/` から生成します。
-   既にある場合は上書きせず、`docs/harness-guidance.md` に追記候補だけを残します。
+3. **Harness 初期化:** 取り込み先に `CLAUDE.md` / `AGENTS.md` が無ければ `templates/` から生成します。
+   会話起動でも `/harness` 起動でも同じ処理です。既に独自内容がある場合は上書きせず、
+   `docs/harness-guidance.md` に追記候補だけを残します。
 4. **なぜこの形か:** `CLAUDE.md` / `AGENTS.md` はプロジェクト固有の永続ルールです。ハーネスは
    どのリポジトリにも差し込める開発ワークフローなので、永続ルールを上書きせず、skill と runtime
    context として配る方が衝突しにくいです。

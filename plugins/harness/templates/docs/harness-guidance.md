@@ -9,6 +9,8 @@ Use this file when the repository already has `CLAUDE.md` or `AGENTS.md` and the
 
 For substantial app, site, tool, or multi-step feature work, use Agentic Harness.
 
+- Normal flow: the user can simply ask to build the app or feature; the harness entry skill should detect it.
+- Explicit flow: use `/harness <idea>` or the installed harness skill directly.
 - Planner writes `docs/spec.md` and focuses on what the product should do.
 - Planner asks the user to choose major product direction with short multiple-choice questions before writing the full spec.
 - Generator writes `docs/progress.md` and implements one sprint at a time.

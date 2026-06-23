@@ -32,14 +32,15 @@ Planner ──→ Generator ──→ Evaluator
 
 ### 0. 準備（docs雛形）
 `docs/` が無ければ `docs/spec.md`・`docs/progress.md`・`docs/feedback/` を作る
-（`/harness` コマンドでも生成できる）。
+（通常は `using-harness` が会話から起動して生成する。`/harness` コマンドでも生成できる）。
 
 永続ガイダンスも no-overwrite で用意する：
 - `CLAUDE.md` が無ければ `templates/CLAUDE.md` から作る。
 - `AGENTS.md` が無ければ `templates/AGENTS.md` から作る。
-- 既にある場合は上書きせず、`docs/harness-guidance.md` が無ければ
+- 既に独自内容がある場合は上書きせず、`docs/harness-guidance.md` が無ければ
   `templates/docs/harness-guidance.md` から作り、既存ガイダンスへの追記候補を残す。
-- Hook は永続ファイルを生成しない。生成はユーザーが `/harness` または harness skill を使った時だけ行う。
+- Hook は永続ファイルを生成しない。生成はユーザーの会話が `using-harness` に該当した時、または
+  `/harness` を明示実行した時だけ行う。
 
 ### Step 1: 企画（Planner を dispatch）
 - ユーザーの短いプロンプトを Planner に渡す。

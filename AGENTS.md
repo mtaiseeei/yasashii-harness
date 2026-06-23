@@ -28,7 +28,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 - `.agents/plugins/marketplace.json`: Codex repo marketplace catalog.
 - `plugins/harness/.claude-plugin/plugin.json`: Claude Code plugin manifest.
 - `plugins/harness/.codex-plugin/plugin.json`: Codex plugin manifest.
-- `plugins/harness/skills/using-harness/SKILL.md`: entry skill injected in Claude Code and discoverable in Codex.
+- `plugins/harness/skills/using-harness/SKILL.md`: normal conversational entrypoint. It detects substantial build requests, initializes guidance, and routes into `harness-loop`.
 - `plugins/harness/skills/harness-loop/SKILL.md`: orchestration brain.
 - `plugins/harness/agents/*.md`: Claude Code role agents.
 - `plugins/harness/commands/harness.md`: Claude Code command that initializes a target repo and starts the loop.
@@ -38,8 +38,8 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 - Keep Claude Code and Codex behavior aligned where possible, but do not pretend their extension systems are identical.
 - Do not make Playwright MCP a hard dependency. It is a CLI fallback, not the default app path.
-- Do not let hooks write project guidance files. Guidance generation belongs to `/harness` initialization and must be no-overwrite.
-- Keep install-facing text actionable: after installing, users should know to run `/harness <idea>`.
+- Do not let hooks write project guidance files. Guidance generation belongs to harness initialization, whether conversational or `/harness`, and must be no-overwrite.
+- Keep install-facing text actionable: after installing, users should know they can just ask for an app, with `/harness <idea>` as an explicit shortcut.
 - The Planner question loop is mandatory for substantial builds. Do not collapse it into assumptions unless the user explicitly asks the agent to decide.
 - Do not hardcode Claude model names in reusable workflow files. Inherit host/user defaults unless the user opts into a stronger model.
 - Preserve zero-dependency distribution unless a dependency removes real operational risk.
