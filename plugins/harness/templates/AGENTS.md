@@ -34,6 +34,10 @@ Do not cross these ownership boundaries. If a role finds a problem outside its f
 ## Planning Rules
 
 - Planner describes what the product should do, not how to implement it.
+- Planner should ask the user to decide major product direction before writing the full spec.
+- Use Codex's structured user input UI when available. Ask at most three multiple-choice questions per round, with 2-3 options and a recommended option when appropriate.
+- Continue the question loop until the target user, core experience, success state, scope boundaries, and experience direction are clear.
+- If the user explicitly says to proceed or leave it to the agent, put the remaining uncertainty in `docs/spec.md` as assumptions.
 - Avoid premature stack, schema, endpoint, or component decisions in `docs/spec.md`.
 - If a decision changes the product direction, ask the user before implementation.
 - Prefer ambitious but testable product behavior over a tiny CRUD-only MVP.
@@ -63,3 +67,6 @@ Browser verification priority:
 
 Do not declare completion only because code was written. A sprint is complete only after Evaluator verifies the running product and writes feedback.
 
+## Model Policy
+
+Do not pin this workflow to a host-specific model name in reusable guidance. Inherit the user's current model by default. If the host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator may use the strongest available reasoning model for that host.

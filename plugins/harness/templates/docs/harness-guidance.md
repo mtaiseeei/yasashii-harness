@@ -10,6 +10,7 @@ Use this file when the repository already has `CLAUDE.md` or `AGENTS.md` and the
 For substantial app, site, tool, or multi-step feature work, use Agentic Harness.
 
 - Planner writes `docs/spec.md` and focuses on what the product should do.
+- Planner asks the user to choose major product direction with short multiple-choice questions before writing the full spec.
 - Generator writes `docs/progress.md` and implements one sprint at a time.
 - Evaluator writes `docs/feedback/sprint-N.md` after operating the real app.
 - Do not cross file ownership boundaries.
@@ -22,4 +23,3 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - If `CLAUDE.md` or `AGENTS.md` already exists, do not overwrite it.
 - Add the suggested block manually only after checking that it does not conflict with existing project rules.
 - Keep project-specific commands and conventions in the existing guidance file. Harness guidance should only define the Planner -> Generator -> Evaluator workflow.
-

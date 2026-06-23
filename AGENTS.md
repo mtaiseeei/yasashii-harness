@@ -7,6 +7,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 ## Core Product
 
 - `Planner` expands a short idea into `docs/spec.md`.
+- Planner must first ask the user to choose major product direction with short multiple-choice questions when meaningful decisions are still open.
 - `Generator` implements one sprint at a time and updates `docs/progress.md`.
 - `Evaluator` operates the running app, scores the sprint, and writes `docs/feedback/sprint-N.md`.
 - The loop is intentionally adversarial: generation and evaluation are separate because self-evaluation is usually too positive.
@@ -14,6 +15,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 ## Design Principles
 
 1. Separate What from How. Planner writes product behavior and acceptance criteria, not stack choices, schemas, or API designs.
+   Use host-native user-question UI for product decisions: Claude Code `AskUserQuestion` when available; Codex structured user input when available.
 2. Persist handoffs in files. Use `spec.md -> progress.md -> feedback/sprint-N.md` so sessions can restart cheaply.
 3. Keep one writer per canonical file. Planner owns spec, Generator owns progress, Evaluator owns feedback.
 4. Gate progress with thresholds. One failed threshold means the sprint returns to Generator.
@@ -38,6 +40,8 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 - Do not make Playwright MCP a hard dependency. It is a CLI fallback, not the default app path.
 - Do not let hooks write project guidance files. Guidance generation belongs to `/harness` initialization and must be no-overwrite.
 - Keep install-facing text actionable: after installing, users should know to run `/harness <idea>`.
+- The Planner question loop is mandatory for substantial builds. Do not collapse it into assumptions unless the user explicitly asks the agent to decide.
+- Do not hardcode Claude model names in reusable workflow files. Inherit host/user defaults unless the user opts into a stronger model.
 - Preserve zero-dependency distribution unless a dependency removes real operational risk.
 
 ## Validation

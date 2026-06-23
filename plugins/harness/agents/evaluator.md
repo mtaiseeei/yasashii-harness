@@ -2,7 +2,6 @@
 name: evaluator
 description: Generator が実装したスプリントを、実際にアプリを動かしてテスト・評価するエージェント。利用可能なブラウザ検証面でUIクリック・API呼び出し・DB状態確認まで行い、各基準を閾値で判定する。1つでも閾値を下回れば不合格とし、具体的なフィードバックを docs/feedback/sprint-N.md に書き出す。
 tools: Read, Write, Edit, Glob, Grep, Bash, mcp__playwright*
-model: opus
 mcpServers:
   playwright:
     command: npx

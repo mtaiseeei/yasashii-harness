@@ -25,6 +25,10 @@ Planner writes what the product should do in `docs/spec.md`. Planner should not 
 
 Generator owns how to implement the sprint.
 
+Before writing the full spec, Planner must identify the small number of product decisions the user should own and ask them as structured multiple-choice questions. Claude Code should use `AskUserQuestion` when available. Codex should use its structured user input UI when available. If neither exists, ask concise numbered choices in chat. This keeps the product direction user-owned while keeping implementation details delegated to Generator.
+
+The loop continues until the target user, core experience, success state, scope boundaries, and experience direction are clear. If the user explicitly asks the agent to decide, remaining uncertainty becomes a written assumption in `docs/spec.md`.
+
 ### Persist Handoffs In Files
 
 The loop communicates through files:
@@ -164,6 +168,10 @@ This repository supports:
 - Claude Code plugin manifest via `plugins/harness/.claude-plugin/plugin.json`.
 - Codex plugin manifest via `plugins/harness/.codex-plugin/plugin.json`.
 
+### Model Policy
+
+The plugin should not hardcode Claude-specific model names such as `opus` in reusable workflow files. Claude Code and Codex expose different model surfaces, and users may have their own default/cost settings. The default policy is to inherit the host/user model. If a host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator are the best candidates for the strongest available reasoning model; Generator can usually inherit the default.
+
 ### Browser Verification Priority
 
 Evaluator chooses the best available verification surface:
@@ -207,4 +215,3 @@ agentic-harness/
 - Add Windows-compatible hook/script paths.
 - Add a tiny example project or recorded walkthrough without bloating the plugin.
 - Consider a deterministic Playwright helper for CLI evaluation.
-
