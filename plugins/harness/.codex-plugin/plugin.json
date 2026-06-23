@@ -1,7 +1,7 @@
 {
   "name": "harness",
   "version": "0.1.0",
-  "description": "Planner / Generator / Evaluator loop for harness-driven application development.",
+  "description": "Planner / Generator / Evaluator loop for harness-driven application development. After installing, start with $using-harness or $harness-loop.",
   "author": {
     "name": "taisei",
     "url": "https://github.com/mtaiseeei"
@@ -20,7 +20,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Agentic Harness",
-    "shortDescription": "Run a Planner -> Generator -> Evaluator development loop.",
+    "shortDescription": "After installing, start with $using-harness or $harness-loop.",
     "longDescription": "Agentic Harness turns a short product idea into a file-backed loop: Planner writes docs/spec.md, Generator implements one sprint at a time, and Evaluator verifies the result before the next sprint.",
     "developerName": "taisei",
     "category": "Productivity",

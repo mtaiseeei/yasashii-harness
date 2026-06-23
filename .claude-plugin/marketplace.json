@@ -11,7 +11,7 @@
     {
       "name": "harness",
       "source": "./plugins/harness",
-      "description": "Planner / Generator / Evaluator の3エージェントによるハーネス駆動開発。GANの発想で生成と評価を分離し、仕様→実装→検証のループを回す。",
+      "description": "Planner / Generator / Evaluator loop for harness-driven development. After installing, run /harness <your app idea> to start.",
       "version": "0.1.0",
       "author": {
         "name": "taisei"
