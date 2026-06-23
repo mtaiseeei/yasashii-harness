@@ -1,0 +1,25 @@
+{
+  "name": "agentic-harness",
+  "owner": {
+    "name": "taisei"
+  },
+  "metadata": {
+    "description": "ハーネス駆動開発プラグイン。短いアイデアから Planner → Generator → Evaluator の自律ループでアプリを作る。",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "harness",
+      "source": "./plugins/harness",
+      "description": "Planner / Generator / Evaluator の3エージェントによるハーネス駆動開発。GANの発想で生成と評価を分離し、仕様→実装→検証のループを回す。",
+      "version": "0.1.0",
+      "author": {
+        "name": "taisei"
+      },
+      "repository": "https://github.com/mtaiseeei/agentic-harness",
+      "license": "MIT",
+      "category": "development",
+      "tags": ["harness", "planner", "generator", "evaluator", "agentic", "tdd", "ai-orchestration"]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "harness",
+  "description": "Planner / Generator / Evaluator の3エージェントによるハーネス駆動開発。仕様→実装→検証のループを自律的に回す。",
+  "version": "0.1.0",
+  "author": {
+    "name": "taisei"
+  },
+  "homepage": "https://github.com/mtaiseeei/agentic-harness",
+  "repository": "https://github.com/mtaiseeei/agentic-harness",
+  "license": "MIT",
+  "keywords": ["harness", "planner", "generator", "evaluator", "agentic", "ai-orchestration"]
+}
