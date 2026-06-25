@@ -60,8 +60,8 @@ no-overwrite 初期化と `harness-loop` へ進みます。普段は「〇〇な
 会話で「〇〇なアプリを作って」と言うだけで、入口 skill がハーネスを起動します。
 明示的に始めたい場合は `/harness シンプルなTODOアプリ` も使えます。
 
-1. **Planner** がアイデアを `docs/spec.md`（製品仕様）に展開
-2. **Generator** が 1スプリント＝1機能ずつ実装し、`docs/progress.md` に自己評価
+1. **Planner** がアイデアを短い `docs/spec.md`、詳細 `docs/spec/*.md`、`docs/sprints/` のスプリント契約に展開
+2. **Generator** が 1スプリント＝1機能ずつ実装し、`docs/progress/sprint-N.md` に自己評価
 3. **Evaluator** が実際に操作してテストし、`docs/feedback/sprint-N.md` に合否
 4. 不合格なら Generator に差し戻し → 合格なら次スプリントへ
 
@@ -92,14 +92,22 @@ Planner ──→ Generator ──→ Evaluator
 | ファイル | 書き手 |
 |---|---|
 | `docs/spec.md` | Planner のみ |
-| `docs/progress.md` | Generator のみ |
+| `docs/spec/*.md` | Planner のみ |
+| `docs/sprints/current.md` | Planner のみ |
+| `docs/sprints/sprint-N.md` | Planner のみ |
+| `docs/progress/sprint-N.md` | Generator のみ |
 | `docs/feedback/sprint-N.md` | Evaluator のみ |
+
+`docs/spec.md` は長い仕様本文ではなく、読むべき詳細仕様と現在スプリントを示す短い正本インデックスです。
+全スプリント共通の製品正本は `docs/spec/`、過去スプリント固有の判断は `docs/sprints/`、実装ログは
+`docs/progress/` に分けます。
 
 ## 設計原則（一次情報に基づく）
 
 1. **What と How を分離** — Planner は「何を」に徹し、「どう作るか」は Generator に委ねる
    （実装の誤指定は下流に伝播する）。
-2. **ファイルで受け渡す** — spec → progress → feedback。セッションをまたいでも状態が残る。
+2. **ファイルで受け渡す** — spec index / spec details / sprint contract → progress → feedback。
+   セッションをまたいでも状態が残り、過去スプリント判断が現在の正本を肥大化させない。
 3. **生成と評価を分離（GAN）** — 自己評価は甘くなる。独立した懐疑的な評価器がループを締める。
 4. **閾値で合否・苦手を重く** — 各基準に閾値。モデルが苦手なデザイン性・独自性を重く見る。
 5. **実際に動かして検証** — コードを読むだけにせず、利用可能なブラウザ検証面で操作してから採点する。

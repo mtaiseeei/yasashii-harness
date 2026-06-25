@@ -10,8 +10,8 @@ Normally, just ask Claude Code to build the app or feature. The harness entry sk
 
 ## Loop
 
-1. Planner turns the idea into `docs/spec.md`.
-2. Generator implements one sprint and updates `docs/progress.md`.
+1. Planner turns the idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files, and sprint contracts in `docs/sprints/`.
+2. Generator implements one sprint and updates `docs/progress/sprint-N.md`.
 3. Evaluator runs the app, verifies behavior, and writes `docs/feedback/sprint-N.md`.
 4. Failed sprints go back to Generator. Passed sprints move forward.
 
@@ -19,11 +19,19 @@ Normally, just ask Claude Code to build the app or feature. The harness entry sk
 
 | File | Purpose | Only writer |
 |---|---|---|
-| `docs/spec.md` | Product specification and sprint acceptance criteria | Planner |
-| `docs/progress.md` | Implementation progress, self-evaluation, startup/test handoff | Generator |
+| `docs/spec.md` | Short canonical index and links to required spec files | Planner |
+| `docs/spec/product.md` | Product purpose, users, goals, non-goals, success state | Planner |
+| `docs/spec/features.md` | Cross-sprint feature list and user-visible behavior | Planner |
+| `docs/spec/constraints.md` | Cross-cutting constraints, prohibitions, safety and privacy rules | Planner |
+| `docs/spec/domain.md` | Domain rules, conceptual data, KPI/calculation definitions | Planner |
+| `docs/spec/ui.md` | Product-wide UI/UX requirements | Planner |
+| `docs/sprints/current.md` | Current/next sprint pointer and required handoff paths | Planner |
+| `docs/sprints/sprint-N.md` | Sprint-specific goal, assumptions, and acceptance criteria | Planner |
+| `docs/progress/sprint-N.md` | Implementation progress, self-evaluation, startup/test handoff | Generator |
 | `docs/feedback/sprint-N.md` | Evaluator result, scores, bugs, reproduction steps | Evaluator |
 
 Do not cross these ownership boundaries. If a role finds a problem outside its file, record it in its own handoff instead of editing another role's source of truth.
+If an older `docs/progress.md` exists, treat it as a legacy reference log and do not append new sprint progress there.
 
 ## Planning Rules
 
@@ -31,8 +39,8 @@ Do not cross these ownership boundaries. If a role finds a problem outside its f
 - Planner should ask the user to decide major product direction before writing the full spec.
 - Use Claude Code's `AskUserQuestion` when available. Ask at most three multiple-choice questions per round, with 2-3 options and a recommended option when appropriate.
 - Continue the question loop until the target user, core experience, success state, scope boundaries, and experience direction are clear.
-- If the user explicitly says to proceed or leave it to the agent, put the remaining uncertainty in `docs/spec.md` as assumptions.
-- Avoid premature stack, schema, endpoint, or component decisions in `docs/spec.md`.
+- If the user explicitly says to proceed or leave it to the agent, put cross-cutting uncertainty in `docs/spec/product.md` or `docs/spec/constraints.md`, and sprint-specific uncertainty in `docs/sprints/sprint-N.md`.
+- Avoid premature stack, schema, endpoint, or component decisions in the spec files.
 - If a decision changes the product direction, ask the user before implementation.
 - Prefer ambitious but testable product behavior over a tiny CRUD-only MVP.
 
@@ -40,7 +48,8 @@ Do not cross these ownership boundaries. If a role finds a problem outside its f
 
 - Generator works one sprint at a time.
 - Keep the app runnable at the end of every sprint.
-- Update `docs/progress.md` with implemented features, known issues, startup command, test URL, and concrete evaluation scenarios.
+- Read `docs/spec.md`, the required `docs/spec/*.md` files, `docs/sprints/current.md`, and the target `docs/sprints/sprint-N.md` before editing code.
+- Update `docs/progress/sprint-N.md` with implemented features, known issues, startup command, test URL, and concrete evaluation scenarios.
 - Fix failing feedback before starting a new sprint.
 
 ## Evaluation Rules

@@ -21,23 +21,33 @@ The central idea is adversarial separation: the agent that builds the product sh
 
 ### Separate What From How
 
-Planner writes what the product should do in `docs/spec.md`. Planner should not decide stack, database schema, endpoint shape, component structure, or other implementation details. If Planner guesses wrong, the mistake propagates into Generator and Evaluator.
+Planner writes what the product should do in `docs/spec.md`, `docs/spec/*.md`, and `docs/sprints/*.md`.
+`docs/spec.md` stays short as the canonical index. Cross-sprint product truth lives in `docs/spec/*.md`.
+Sprint-specific goals and acceptance criteria live in `docs/sprints/sprint-N.md`. Planner should not decide stack,
+database schema, endpoint shape, component structure, or other implementation details. If Planner guesses wrong,
+the mistake propagates into Generator and Evaluator.
 
 Generator owns how to implement the sprint.
 
 Before writing the full spec, Planner must identify the small number of product decisions the user should own and ask them as structured multiple-choice questions. Claude Code should use `AskUserQuestion` when available. Codex should use its structured user input UI when available. If neither exists, ask concise numbered choices in chat. This keeps the product direction user-owned while keeping implementation details delegated to Generator.
 
-The loop continues until the target user, core experience, success state, scope boundaries, and experience direction are clear. If the user explicitly asks the agent to decide, remaining uncertainty becomes a written assumption in `docs/spec.md`.
+The loop continues until the target user, core experience, success state, scope boundaries, and experience direction are clear.
+If the user explicitly asks the agent to decide, remaining cross-cutting uncertainty becomes a written assumption in
+`docs/spec/product.md` or `docs/spec/constraints.md`; sprint-specific uncertainty goes in `docs/sprints/sprint-N.md`.
 
 ### Persist Handoffs In Files
 
 The loop communicates through files:
 
-- `docs/spec.md`: Planner output.
-- `docs/progress.md`: Generator output.
+- `docs/spec.md`: Planner-owned short index and read order.
+- `docs/spec/*.md`: Planner-owned cross-sprint product truth.
+- `docs/sprints/current.md`: Planner-owned pointer to the active sprint.
+- `docs/sprints/sprint-N.md`: Planner-owned sprint contract.
+- `docs/progress/sprint-N.md`: Generator output for one sprint.
 - `docs/feedback/sprint-N.md`: Evaluator output.
 
-This makes state durable across sessions and keeps context recovery cheap.
+This makes state durable across sessions, keeps context recovery cheap, and prevents past sprint decisions from bloating
+the current product source of truth.
 
 ### Keep One Writer Per Canonical File
 
@@ -46,7 +56,9 @@ Each file has exactly one owner:
 | File | Only writer |
 |---|---|
 | `docs/spec.md` | Planner |
-| `docs/progress.md` | Generator |
+| `docs/spec/*.md` | Planner |
+| `docs/sprints/*.md` | Planner |
+| `docs/progress/sprint-N.md` | Generator |
 | `docs/feedback/sprint-N.md` | Evaluator |
 
 Other roles may read the file but must not edit it.

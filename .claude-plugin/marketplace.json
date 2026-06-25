@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "ハーネス駆動開発プラグイン。短いアイデアから Planner → Generator → Evaluator の自律ループでアプリを作る。",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
-      "description": "Planner / Generator / Evaluator loop for harness-driven development. After installing, run /harness <your app idea> to start.",
-      "version": "0.1.0",
+      "description": "Planner / Generator / Evaluator loop for harness-driven development with split specs, sprint contracts, and per-sprint progress.",
+      "version": "0.1.1",
       "author": {
         "name": "taisei"
       },

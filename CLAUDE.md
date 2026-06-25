@@ -6,9 +6,9 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 ## Core Product
 
-- `Planner` expands a short idea into `docs/spec.md`.
+- `Planner` expands a short idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files, and sprint contracts in `docs/sprints/`.
 - Planner must first ask the user to choose major product direction with short multiple-choice questions when meaningful decisions are still open.
-- `Generator` implements one sprint at a time and updates `docs/progress.md`.
+- `Generator` implements one sprint at a time and updates `docs/progress/sprint-N.md`.
 - `Evaluator` operates the running app, scores the sprint, and writes `docs/feedback/sprint-N.md`.
 - The loop is intentionally adversarial: generation and evaluation are separate because self-evaluation is usually too positive.
 
@@ -16,8 +16,8 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 1. Separate What from How. Planner writes product behavior and acceptance criteria, not stack choices, schemas, or API designs.
    Use host-native user-question UI for product decisions: Claude Code `AskUserQuestion` when available; Codex structured user input when available.
-2. Persist handoffs in files. Use `spec.md -> progress.md -> feedback/sprint-N.md` so sessions can restart cheaply.
-3. Keep one writer per canonical file. Planner owns spec, Generator owns progress, Evaluator owns feedback.
+2. Persist handoffs in files. Use `spec.md` as a short index, `docs/spec/*.md` for cross-sprint product truth, `docs/sprints/sprint-N.md` for sprint contracts, `docs/progress/sprint-N.md` for implementation handoff, and `docs/feedback/sprint-N.md` for evaluation.
+3. Keep one writer per canonical file. Planner owns spec and sprint contracts, Generator owns progress files, Evaluator owns feedback.
 4. Gate progress with thresholds. One failed threshold means the sprint returns to Generator.
 5. Verify the real app before completion. Do not mark work complete from code inspection alone.
 6. Prefer local host-native browser verification: Codex App uses Browser Use, Claude Code Desktop uses Preview, CLI uses Playwright.

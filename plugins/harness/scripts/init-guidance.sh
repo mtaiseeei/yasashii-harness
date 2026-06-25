@@ -9,13 +9,39 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TARGET_ROOT="${1:-$(pwd)}"
 
-mkdir -p "${TARGET_ROOT}/docs" "${TARGET_ROOT}/docs/feedback"
-
-touch "${TARGET_ROOT}/docs/spec.md"
-touch "${TARGET_ROOT}/docs/progress.md"
-
 created_any=false
 had_custom_guidance_target=false
+
+ensure_dir() {
+    local dir="$1"
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir"
+        printf 'created %s\n' "$dir"
+        created_any=true
+    fi
+}
+
+ensure_file() {
+    local file="$1"
+    if [[ ! -e "$file" ]]; then
+        touch "$file"
+        printf 'created %s\n' "$file"
+        created_any=true
+    fi
+}
+
+ensure_dir "${TARGET_ROOT}/docs/spec"
+ensure_dir "${TARGET_ROOT}/docs/sprints"
+ensure_dir "${TARGET_ROOT}/docs/progress"
+ensure_dir "${TARGET_ROOT}/docs/feedback"
+
+ensure_file "${TARGET_ROOT}/docs/spec.md"
+ensure_file "${TARGET_ROOT}/docs/spec/product.md"
+ensure_file "${TARGET_ROOT}/docs/spec/features.md"
+ensure_file "${TARGET_ROOT}/docs/spec/constraints.md"
+ensure_file "${TARGET_ROOT}/docs/spec/domain.md"
+ensure_file "${TARGET_ROOT}/docs/spec/ui.md"
+ensure_file "${TARGET_ROOT}/docs/sprints/current.md"
 
 if [[ -e "${TARGET_ROOT}/CLAUDE.md" ]] && ! cmp -s "${PLUGIN_ROOT}/templates/CLAUDE.md" "${TARGET_ROOT}/CLAUDE.md"; then
     had_custom_guidance_target=true

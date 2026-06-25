@@ -1,7 +1,7 @@
 {
   "name": "harness",
-  "description": "Planner / Generator / Evaluator loop for harness-driven development. After installing, run /harness <your app idea> to start.",
-  "version": "0.1.0",
+  "description": "Planner / Generator / Evaluator loop for harness-driven development with split specs, sprint contracts, and per-sprint progress.",
+  "version": "0.1.1",
   "author": {
     "name": "taisei"
   },
