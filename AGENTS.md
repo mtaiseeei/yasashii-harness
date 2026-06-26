@@ -8,15 +8,17 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 - `Planner` expands a short idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files, and sprint contracts in `docs/sprints/`.
 - Planner must first ask the user to choose major product direction with short multiple-choice questions when meaningful decisions are still open.
-- `Generator` implements one sprint at a time and updates `docs/progress/sprint-N.md`.
-- `Evaluator` operates the running app, scores the sprint, and writes `docs/feedback/sprint-N.md`.
+- `Generator` implements one sprint at a time and updates the matching `docs/progress/sprint-*.md`.
+- `Evaluator` operates the running app, scores the sprint, and writes the matching `docs/feedback/sprint-*.md`.
+- Sprint IDs use zero-padded filenames such as `sprint-005.md`; never create decimal IDs such as `sprint-5.10.md`.
+- Extra work around an accepted sprint becomes an automatic Patch Sprint such as `sprint-005-patch-001.md` unless it is required to fix failed Evaluator feedback.
 - The loop is intentionally adversarial: generation and evaluation are separate because self-evaluation is usually too positive.
 
 ## Design Principles
 
 1. Separate What from How. Planner writes product behavior and acceptance criteria, not stack choices, schemas, or API designs.
    Use host-native user-question UI for product decisions: Claude Code `AskUserQuestion` when available; Codex structured user input when available.
-2. Persist handoffs in files. Use `spec.md` as a short index, `docs/spec/*.md` for cross-sprint product truth, `docs/sprints/sprint-N.md` for sprint contracts, `docs/progress/sprint-N.md` for implementation handoff, and `docs/feedback/sprint-N.md` for evaluation.
+2. Persist handoffs in files. Use `spec.md` as a short index, `docs/spec/*.md` for cross-sprint product truth, `docs/sprints/sprint-NNN.md` or `docs/sprints/sprint-NNN-patch-PPP.md` for sprint contracts, matching `docs/progress/sprint-*.md` for implementation handoff, and matching `docs/feedback/sprint-*.md` for evaluation.
 3. Keep one writer per canonical file. Planner owns spec and sprint contracts, Generator owns progress files, Evaluator owns feedback.
 4. Gate progress with thresholds. One failed threshold means the sprint returns to Generator.
 5. Verify the real app before completion. Do not mark work complete from code inspection alone.

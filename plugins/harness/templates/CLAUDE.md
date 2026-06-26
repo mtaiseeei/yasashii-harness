@@ -11,8 +11,8 @@ Normally, just ask Claude Code to build the app or feature. The harness entry sk
 ## Loop
 
 1. Planner turns the idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files, and sprint contracts in `docs/sprints/`.
-2. Generator implements one sprint and updates `docs/progress/sprint-N.md`.
-3. Evaluator runs the app, verifies behavior, and writes `docs/feedback/sprint-N.md`.
+2. Generator implements one sprint and updates the matching `docs/progress/sprint-*.md`.
+3. Evaluator runs the app, verifies behavior, and writes the matching `docs/feedback/sprint-*.md`.
 4. Failed sprints go back to Generator. Passed sprints move forward.
 
 ## Canonical Files
@@ -26,12 +26,15 @@ Normally, just ask Claude Code to build the app or feature. The harness entry sk
 | `docs/spec/domain.md` | Domain rules, conceptual data, KPI/calculation definitions | Planner |
 | `docs/spec/ui.md` | Product-wide UI/UX requirements | Planner |
 | `docs/sprints/current.md` | Current/next sprint pointer and required handoff paths | Planner |
-| `docs/sprints/sprint-N.md` | Sprint-specific goal, assumptions, and acceptance criteria | Planner |
-| `docs/progress/sprint-N.md` | Implementation progress, self-evaluation, startup/test handoff | Generator |
-| `docs/feedback/sprint-N.md` | Evaluator result, scores, bugs, reproduction steps | Evaluator |
+| `docs/sprints/sprint-NNN.md` | Main sprint contract, e.g. `sprint-005.md` | Planner |
+| `docs/sprints/sprint-NNN-patch-PPP.md` | Patch sprint contract, e.g. `sprint-005-patch-001.md` | Planner |
+| `docs/progress/sprint-*.md` | Implementation progress, self-evaluation, startup/test handoff | Generator |
+| `docs/feedback/sprint-*.md` | Evaluator result, scores, bugs, reproduction steps | Evaluator |
 
 Do not cross these ownership boundaries. If a role finds a problem outside its file, record it in its own handoff instead of editing another role's source of truth.
 If an older `docs/progress.md` exists, treat it as a legacy reference log and do not append new sprint progress there.
+Use zero-padded sprint IDs. Do not create decimal sprint IDs such as `sprint-5.1` or `sprint-5.10`.
+For work between main sprints, use `sprint-NNN-patch-PPP`.
 
 ## Planning Rules
 
@@ -39,7 +42,7 @@ If an older `docs/progress.md` exists, treat it as a legacy reference log and do
 - Planner should ask the user to decide major product direction before writing the full spec.
 - Use Claude Code's `AskUserQuestion` when available. Ask at most three multiple-choice questions per round, with 2-3 options and a recommended option when appropriate.
 - Continue the question loop until the target user, core experience, success state, scope boundaries, and experience direction are clear.
-- If the user explicitly says to proceed or leave it to the agent, put cross-cutting uncertainty in `docs/spec/product.md` or `docs/spec/constraints.md`, and sprint-specific uncertainty in `docs/sprints/sprint-N.md`.
+- If the user explicitly says to proceed or leave it to the agent, put cross-cutting uncertainty in `docs/spec/product.md` or `docs/spec/constraints.md`, and sprint-specific uncertainty in the target `docs/sprints/sprint-*.md`.
 - Avoid premature stack, schema, endpoint, or component decisions in the spec files.
 - If a decision changes the product direction, ask the user before implementation.
 - Prefer ambitious but testable product behavior over a tiny CRUD-only MVP.
@@ -48,9 +51,10 @@ If an older `docs/progress.md` exists, treat it as a legacy reference log and do
 
 - Generator works one sprint at a time.
 - Keep the app runnable at the end of every sprint.
-- Read `docs/spec.md`, the required `docs/spec/*.md` files, `docs/sprints/current.md`, and the target `docs/sprints/sprint-N.md` before editing code.
-- Update `docs/progress/sprint-N.md` with implemented features, known issues, startup command, test URL, and concrete evaluation scenarios.
+- Read `docs/spec.md`, the required `docs/spec/*.md` files, `docs/sprints/current.md`, and the target `docs/sprints/sprint-*.md` before editing code.
+- Update the matching `docs/progress/sprint-*.md` with implemented features, known issues, startup command, test URL, and concrete evaluation scenarios.
 - Fix failing feedback before starting a new sprint.
+- Do not silently include user-requested work that is outside the current acceptance criteria. Record it as a scope change and route it to Planner for an automatically numbered Patch Sprint.
 
 ## Evaluation Rules
 
@@ -58,6 +62,7 @@ If an older `docs/progress.md` exists, treat it as a legacy reference log and do
 - Capture or reference visual evidence when UI quality matters.
 - Score against thresholds; one failed threshold means the sprint fails.
 - Be strict about regressions. Existing accepted behavior must keep working.
+- For Patch Sprint IDs such as `sprint-005-patch-001`, verify the patch behavior, base sprint regression, and absence of next-main-sprint feature leakage.
 
 Browser verification priority:
 

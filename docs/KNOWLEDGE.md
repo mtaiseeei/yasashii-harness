@@ -23,7 +23,8 @@ The central idea is adversarial separation: the agent that builds the product sh
 
 Planner writes what the product should do in `docs/spec.md`, `docs/spec/*.md`, and `docs/sprints/*.md`.
 `docs/spec.md` stays short as the canonical index. Cross-sprint product truth lives in `docs/spec/*.md`.
-Sprint-specific goals and acceptance criteria live in `docs/sprints/sprint-N.md`. Planner should not decide stack,
+Sprint-specific goals and acceptance criteria live in `docs/sprints/sprint-NNN.md` for main sprints and
+`docs/sprints/sprint-NNN-patch-PPP.md` for patch sprints. Planner should not decide stack,
 database schema, endpoint shape, component structure, or other implementation details. If Planner guesses wrong,
 the mistake propagates into Generator and Evaluator.
 
@@ -33,7 +34,8 @@ Before writing the full spec, Planner must identify the small number of product 
 
 The loop continues until the target user, core experience, success state, scope boundaries, and experience direction are clear.
 If the user explicitly asks the agent to decide, remaining cross-cutting uncertainty becomes a written assumption in
-`docs/spec/product.md` or `docs/spec/constraints.md`; sprint-specific uncertainty goes in `docs/sprints/sprint-N.md`.
+`docs/spec/product.md` or `docs/spec/constraints.md`; sprint-specific uncertainty goes in the target
+`docs/sprints/sprint-*.md`.
 
 ### Persist Handoffs In Files
 
@@ -42,9 +44,10 @@ The loop communicates through files:
 - `docs/spec.md`: Planner-owned short index and read order.
 - `docs/spec/*.md`: Planner-owned cross-sprint product truth.
 - `docs/sprints/current.md`: Planner-owned pointer to the active sprint.
-- `docs/sprints/sprint-N.md`: Planner-owned sprint contract.
-- `docs/progress/sprint-N.md`: Generator output for one sprint.
-- `docs/feedback/sprint-N.md`: Evaluator output.
+- `docs/sprints/sprint-NNN.md`: Planner-owned main sprint contract.
+- `docs/sprints/sprint-NNN-patch-PPP.md`: Planner-owned patch sprint contract.
+- `docs/progress/sprint-*.md`: Generator output for one sprint.
+- `docs/feedback/sprint-*.md`: Evaluator output.
 
 This makes state durable across sessions, keeps context recovery cheap, and prevents past sprint decisions from bloating
 the current product source of truth.
@@ -58,8 +61,12 @@ Each file has exactly one owner:
 | `docs/spec.md` | Planner |
 | `docs/spec/*.md` | Planner |
 | `docs/sprints/*.md` | Planner |
-| `docs/progress/sprint-N.md` | Generator |
-| `docs/feedback/sprint-N.md` | Evaluator |
+| `docs/progress/sprint-*.md` | Generator |
+| `docs/feedback/sprint-*.md` | Evaluator |
+
+Sprint filenames use zero-padded IDs such as `sprint-005.md`. Decimal IDs such as `sprint-5.10.md` are avoided because
+they sort and read ambiguously. Additional polish or small fixes around an accepted sprint become automatically numbered
+patch sprints such as `sprint-005-patch-001.md`, unless they are required to satisfy failed Evaluator feedback.
 
 Other roles may read the file but must not edit it.
 

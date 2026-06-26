@@ -1,6 +1,6 @@
 ---
 name: planner
-description: 1〜4行の短いプロダクトアイデアを受け取り、選択式ヒアリングで重要判断を確認しながら、短い正本インデックス（docs/spec.md）、詳細仕様（docs/spec/*.md）、スプリント契約（docs/sprints/*.md）に展開するエージェント。新しいプロジェクトの企画・設計フェーズで使う。「何を作るか」に集中し、技術的な実装詳細には踏み込まない。
+description: 1〜4行の短いプロダクトアイデアや追加調整要望を受け取り、選択式ヒアリングで重要判断を確認しながら、短い正本インデックス（docs/spec.md）、詳細仕様（docs/spec/*.md）、メインスプリント契約（docs/sprints/sprint-NNN.md）、Patch Sprint契約（docs/sprints/sprint-NNN-patch-PPP.md）に展開するエージェント。新しいプロジェクトの企画・設計フェーズで使う。「何を作るか」に集中し、技術的な実装詳細には踏み込まない。
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 ---
 
@@ -38,7 +38,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 7. 仕様化してよい状態になるまでヒアリングを繰り返す。各ラウンドは最大3問に絞り、細部ではなく
    重要判断だけを聞く。ユーザーが「任せる」「進めて」と明示した場合は、残りを Planner の前提として置く。
 8. まだ軽微な曖昧さが残る場合は Planner が前提を置き、横断前提は `docs/spec/product.md` または
-   `docs/spec/constraints.md`、スプリント固有前提は `docs/sprints/sprint-N.md` に明記する。
+   `docs/spec/constraints.md`、スプリント固有前提は対象の `docs/sprints/sprint-*.md` に明記する。
 
 ### 仕様化 readiness gate
 
@@ -67,6 +67,8 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 ## 仕様書ファイル構成
 
 `docs/spec.md` は短い入口と索引に保つ。詳細本文や長い受け入れ基準をここへ累積しない。
+スプリントIDはゼロ埋め3桁にする。メインスプリントは `sprint-001.md`、`sprint-002.md`。
+Patch Sprint は `sprint-005-patch-001.md` のようにする。小数ID（`sprint-5.1`、`sprint-5.10`）は新規作成しない。
 
 ```markdown
 # [プロダクト名]
@@ -86,8 +88,8 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 - [Generator / Evaluator が毎回読むべき重要制約を短く列挙]
 
 ## 現在の開発状態
-- Current sprint: Sprint N - [テーマ]
-- Sprint contract: `docs/sprints/sprint-N.md`
+- Current ID: sprint-NNN または sprint-NNN-patch-PPP
+- Sprint contract: `docs/sprints/sprint-NNN.md` または `docs/sprints/sprint-NNN-patch-PPP.md`
 ```
 
 `docs/spec/product.md`:
@@ -160,13 +162,16 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 ```markdown
 # Current Sprint
 
-- Current: Sprint N - [テーマ]
-- Contract: `docs/sprints/sprint-N.md`
-- Previous feedback: `docs/feedback/sprint-N.md` またはなし
-- Progress file: `docs/progress/sprint-N.md`
+- Current ID: sprint-NNN または sprint-NNN-patch-PPP
+- Display Name: Sprint N または Sprint N Patch P - [テーマ]
+- Base Sprint: sprint-NNN またはなし
+- Contract: `docs/sprints/sprint-NNN.md` または `docs/sprints/sprint-NNN-patch-PPP.md`
+- Progress: `docs/progress/sprint-NNN.md` または `docs/progress/sprint-NNN-patch-PPP.md`
+- Feedback: `docs/feedback/sprint-NNN.md` または `docs/feedback/sprint-NNN-patch-PPP.md`
+- Next Planned: sprint-NNN
 ```
 
-`docs/sprints/sprint-N.md`:
+`docs/sprints/sprint-NNN.md`:
 
 ```markdown
 # Sprint N: [テーマ]
@@ -185,6 +190,51 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 ## 制約事項 / オープンクエスチョン
 [このスプリント内で特に注意する制約、既知の制限、確定に確認が必要な点]
 ```
+
+`docs/sprints/sprint-NNN-patch-PPP.md`:
+
+```markdown
+# Sprint N Patch P: [調整テーマ]
+
+## 種別
+Patch Sprint
+
+## Base Sprint
+sprint-NNN
+
+## Legacy ID
+[旧小数IDがある場合だけ。例: Sprint 5.5]
+
+## 理由
+[なぜ次のメインスプリントに進む前に独立して処理するか]
+
+## ゴール
+[この小スプリントで整えること]
+
+## 含む変更
+- [ ] [軽微なUI調整、文言整理、導線修正、小さな技術負債返済など]
+
+## 非ゴール
+- 次のメインスプリントの新機能には着手しない。
+- Base Sprint の仕様を無制限に広げない。
+
+## 受け入れ基準（Evaluatorが検証する）:
+- [ ] 対象の調整が確認できること
+- [ ] Base Sprint で合格した主要導線が回帰していないこと
+- [ ] 次のメインスプリントの機能に着手していないこと
+```
+
+## Patch Sprint 自動採番
+
+- ユーザーが「Sprint 5を少し直して」「Sprint 5と6の間に軽微なUI調整をしたい」のように言った場合、
+  ユーザーが「Patch 1」と明示しなくても Patch Sprint として扱う。
+- 既存の `docs/sprints/sprint-005-patch-*.md` を確認し、最大の patch 番号 + 1 を次IDにする。
+  既存がなければ `sprint-005-patch-001`。
+- 小数IDは作らない。旧履歴が `Sprint 5.10` のような名前なら、実行順に
+  `sprint-005-patch-001`, `sprint-005-patch-002` ... と振り直し、旧番号は `Legacy ID` に残す。
+- Evaluator 不合格の修正や、現在スプリントの受け入れ基準を満たすための修正は Patch Sprint にしない。
+  同じスプリント契約内の修正として扱う。
+- 大きな新機能、製品方向の変更、次メインスプリント相当の作業は Patch Sprint ではなく、次のメインスプリント契約にする。
 
 ## やってはいけないこと
 

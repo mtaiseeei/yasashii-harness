@@ -1,7 +1,7 @@
 {
   "name": "harness",
-  "description": "Planner / Generator / Evaluator loop for harness-driven development with split specs, sprint contracts, and per-sprint progress.",
-  "version": "0.1.1",
+  "description": "Planner / Generator / Evaluator loop with split specs, zero-padded sprint IDs, automatic patch sprints, and per-sprint progress.",
+  "version": "0.1.2",
   "author": {
     "name": "taisei"
   },

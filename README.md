@@ -61,8 +61,8 @@ no-overwrite 初期化と `harness-loop` へ進みます。普段は「〇〇な
 明示的に始めたい場合は `/harness シンプルなTODOアプリ` も使えます。
 
 1. **Planner** がアイデアを短い `docs/spec.md`、詳細 `docs/spec/*.md`、`docs/sprints/` のスプリント契約に展開
-2. **Generator** が 1スプリント＝1機能ずつ実装し、`docs/progress/sprint-N.md` に自己評価
-3. **Evaluator** が実際に操作してテストし、`docs/feedback/sprint-N.md` に合否
+2. **Generator** が 1スプリント＝1機能ずつ実装し、対応する `docs/progress/sprint-*.md` に自己評価
+3. **Evaluator** が実際に操作してテストし、対応する `docs/feedback/sprint-*.md` に合否
 4. 不合格なら Generator に差し戻し → 合格なら次スプリントへ
 
 ```
@@ -94,13 +94,18 @@ Planner ──→ Generator ──→ Evaluator
 | `docs/spec.md` | Planner のみ |
 | `docs/spec/*.md` | Planner のみ |
 | `docs/sprints/current.md` | Planner のみ |
-| `docs/sprints/sprint-N.md` | Planner のみ |
-| `docs/progress/sprint-N.md` | Generator のみ |
-| `docs/feedback/sprint-N.md` | Evaluator のみ |
+| `docs/sprints/sprint-NNN.md` | Planner のみ |
+| `docs/sprints/sprint-NNN-patch-PPP.md` | Planner のみ |
+| `docs/progress/sprint-*.md` | Generator のみ |
+| `docs/feedback/sprint-*.md` | Evaluator のみ |
 
 `docs/spec.md` は長い仕様本文ではなく、読むべき詳細仕様と現在スプリントを示す短い正本インデックスです。
 全スプリント共通の製品正本は `docs/spec/`、過去スプリント固有の判断は `docs/sprints/`、実装ログは
 `docs/progress/` に分けます。
+
+スプリントIDは `sprint-005.md` のようにゼロ埋めします。`sprint-5.1.md` や `sprint-5.10.md` のような
+小数IDは作りません。合格済みスプリントへの軽微な追加調整は、ユーザーが明示しなくても
+`sprint-005-patch-001.md` のような Patch Sprint として切ります。
 
 ## 設計原則（一次情報に基づく）
 
