@@ -1,12 +1,19 @@
 {
   "name": "harness",
   "description": "Planner / Generator / Evaluator loop with split specs, zero-padded sprint IDs, automatic patch sprints, and per-sprint progress.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "author": {
     "name": "taisei"
   },
   "homepage": "https://github.com/mtaiseeei/agentic-harness",
   "repository": "https://github.com/mtaiseeei/agentic-harness",
   "license": "MIT",
-  "keywords": ["harness", "planner", "generator", "evaluator", "agentic", "ai-orchestration"]
+  "keywords": [
+    "harness",
+    "planner",
+    "generator",
+    "evaluator",
+    "agentic",
+    "ai-orchestration"
+  ]
 }

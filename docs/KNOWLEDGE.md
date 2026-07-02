@@ -42,12 +42,13 @@ If the user explicitly asks the agent to decide, remaining cross-cutting uncerta
 The loop communicates through files:
 
 - `docs/spec.md`: Planner-owned short index and read order.
-- `docs/spec/*.md`: Planner-owned cross-sprint product truth.
-- `docs/sprints/current.md`: Planner-owned pointer to the active sprint.
+- `docs/spec/*.md`: Planner-owned cross-sprint product truth, including the scoring rubric `docs/spec/rubric.md`.
+- `docs/sprints/state.md`: orchestrator-owned execution state (Current ID, per-sprint status, retry count).
 - `docs/sprints/sprint-NNN.md`: Planner-owned main sprint contract.
-- `docs/sprints/sprint-NNN-patch-PPP.md`: Planner-owned patch sprint contract.
+- `docs/sprints/sprint-NNN-patch-PPP.md`: Planner-owned patch sprint contract (`Type: patch` or `Type: micro`).
 - `docs/progress/sprint-*.md`: Generator output for one sprint.
-- `docs/feedback/sprint-*.md`: Evaluator output.
+- `docs/feedback/sprint-*.md`: Evaluator output with evidence and failure classification.
+- `docs/sprints/current.md`: legacy pointer from v0.1.x. Converted once into `state.md`, then read-only.
 
 This makes state durable across sessions, keeps context recovery cheap, and prevents past sprint decisions from bloating
 the current product source of truth.
@@ -59,8 +60,9 @@ Each file has exactly one owner:
 | File | Only writer |
 |---|---|
 | `docs/spec.md` | Planner |
-| `docs/spec/*.md` | Planner |
-| `docs/sprints/*.md` | Planner |
+| `docs/spec/*.md` (including `rubric.md`) | Planner |
+| `docs/sprints/sprint-*.md` (contracts) | Planner |
+| `docs/sprints/state.md` | Orchestrator (main agent) |
 | `docs/progress/sprint-*.md` | Generator |
 | `docs/feedback/sprint-*.md` | Evaluator |
 
@@ -188,6 +190,42 @@ This repository supports:
 - Claude Code plugin manifest via `plugins/harness/.claude-plugin/plugin.json`.
 - Codex plugin manifest via `plugins/harness/.codex-plugin/plugin.json`.
 
+### Orchestration State Separation (v0.2.0)
+
+The first real-world run (shiga-rinri-analysis, 10 main sprints + 41 patches) exposed a dead zone:
+`docs/sprints/current.md` was Planner-owned, but the pass/fail transition never redispatched Planner,
+so nobody advanced the pointer. The pointer went stale (`Status: Planned` after a recorded PASS),
+two sprints stranded as contract-only files, and post-acceptance work bypassed the loop entirely.
+
+Decision: execution state moved to `docs/sprints/state.md`, owned by the orchestrator, with an explicit
+status vocabulary (`planned/active/awaiting-eval/done/deferred/superseded`), a retry counter,
+a startup consistency check, and a mandatory record-then-advance step.
+
+Alternatives rejected after an adversarial review (Codex):
+
+- Making the orchestrator a second writer of `current.md` — breaks one-writer-per-file.
+- Batching many small fixes into one open patch contract — conflicts with the scope-change gate
+  (no scope growth after work starts). Instead, `Type: micro` patches keep one contract per change
+  but get a lightweight evaluation (completeness, stability, no-regression only).
+- Mandatory screenshots for every pass — stalls the loop when no browser surface is available.
+  Evidence is tiered instead: commands + concrete URL/DOM interaction records always; screenshots
+  only when visual quality is scored.
+
+Related v0.2.0 changes driven by the same run: the entry skill no longer lets "small fixes" bypass a
+harness-managed repository (classify as direct fix / micro patch / patch), Generator must grow an
+automated regression suite (the real project grew `scripts/check-app.mjs` organically — now
+institutionalized), scoring axes are unified across Generator and Evaluator with a Planner-owned
+`docs/spec/rubric.md`, failures are classified `implementation-issue` vs `spec-issue` (spec issues
+return to Planner), three consecutive failures escalate to the user, Generator commits carry sprint-ID
+prefixes, and acceptance tags are opt-in.
+
+### Codex Distribution Limits
+
+The Codex plugin catalog schema distributes `skills` only — no `agents` or `commands` keys (verified
+against the remote plugin catalog cache). Therefore `/harness` is Claude Code-only, and on hosts
+without subagent dispatch the loop runs through the fallback in `harness-loop`: one role per work
+unit, strict file ownership, and never reusing Generator's self-evaluation as the verdict.
+
 ### Model Policy
 
 The plugin should not hardcode Claude-specific model names such as `opus` in reusable workflow files. Claude Code and Codex expose different model surfaces, and users may have their own default/cost settings. The default policy is to inherit the host/user model. If a host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator are the best candidates for the strongest available reasoning model; Generator can usually inherit the default.
@@ -231,7 +269,10 @@ agentic-harness/
 
 ## Future Work
 
-- Add `feature_list.json` support for stricter pass/fail tracking.
+- Add `feature_list.json` support for stricter pass/fail tracking (partially addressed by the
+  v0.2.0 regression-suite duty; a structured format is still open).
 - Add Windows-compatible hook/script paths.
 - Add a tiny example project or recorded walkthrough without bloating the plugin.
 - Consider a deterministic Playwright helper for CLI evaluation.
+- Consider slimming the SessionStart hook injection (short pointer instead of the full skill text
+  for repositories without harness markers).

@@ -53,17 +53,22 @@ codex plugin add harness@agentic-harness-local
 
 Codex では `AGENTS.md` をプラグインから上書きせず、`using-harness` skill が会話から起動して、
 no-overwrite 初期化と `harness-loop` へ進みます。普段は「〇〇なアプリを作って」と普通に会話してください。
-明示的に始めたい場合だけ `/harness`、`$using-harness`、または `$harness-loop` を指定します。
+明示的に始めたい場合だけ `$using-harness` または `$harness-loop` を指定します
+（`/harness` コマンドは Claude Code 専用で、Codex には配布されません）。
 
 ## 使い方
 
 会話で「〇〇なアプリを作って」と言うだけで、入口 skill がハーネスを起動します。
 明示的に始めたい場合は `/harness シンプルなTODOアプリ` も使えます。
 
-1. **Planner** がアイデアを短い `docs/spec.md`、詳細 `docs/spec/*.md`、`docs/sprints/` のスプリント契約に展開
-2. **Generator** が 1スプリント＝1機能ずつ実装し、対応する `docs/progress/sprint-*.md` に自己評価
-3. **Evaluator** が実際に操作してテストし、対応する `docs/feedback/sprint-*.md` に合否
-4. 不合格なら Generator に差し戻し → 合格なら次スプリントへ
+1. **Planner** がアイデアを短い `docs/spec.md`、詳細 `docs/spec/*.md`（採点 rubric を含む）、
+   `docs/sprints/` のスプリント契約に展開
+2. **Generator** が 1スプリント＝1機能ずつ実装し、自動回帰チェックを資産化しながら、
+   対応する `docs/progress/sprint-*.md` に自己評価
+3. **Evaluator** が実際に操作してテストし、証跡付きで対応する `docs/feedback/sprint-*.md` に合否
+4. オーケストレーターが結果を `docs/sprints/state.md` に記録してから遷移。
+   不合格なら Generator に差し戻し（仕様欠陥なら Planner へ）→ 合格なら次スプリントへ。
+   同一スプリント3回連続不合格はユーザーにエスカレーション
 
 ```
 Planner ──→ Generator ──→ Evaluator
@@ -92,20 +97,25 @@ Planner ──→ Generator ──→ Evaluator
 | ファイル | 書き手 |
 |---|---|
 | `docs/spec.md` | Planner のみ |
-| `docs/spec/*.md` | Planner のみ |
-| `docs/sprints/current.md` | Planner のみ |
+| `docs/spec/*.md`（`rubric.md` を含む） | Planner のみ |
+| `docs/sprints/state.md` | オーケストレーター（メインエージェント）のみ |
 | `docs/sprints/sprint-NNN.md` | Planner のみ |
 | `docs/sprints/sprint-NNN-patch-PPP.md` | Planner のみ |
 | `docs/progress/sprint-*.md` | Generator のみ |
 | `docs/feedback/sprint-*.md` | Evaluator のみ |
 
-`docs/spec.md` は長い仕様本文ではなく、読むべき詳細仕様と現在スプリントを示す短い正本インデックスです。
+`docs/spec.md` は長い仕様本文ではなく、読むべき詳細仕様を示す短い正本インデックスです。
+進行状態（Current ID、各スプリントの Status: planned/active/awaiting-eval/done/deferred/superseded、
+Retry Count）は `docs/sprints/state.md` が正本で、サブエージェントではなくオーケストレーターだけが
+更新します（旧形式の `docs/sprints/current.md` は初回に state.md へ変換して参照専用にします）。
 全スプリント共通の製品正本は `docs/spec/`、過去スプリント固有の判断は `docs/sprints/`、実装ログは
 `docs/progress/` に分けます。
 
 スプリントIDは `sprint-005.md` のようにゼロ埋めします。`sprint-5.1.md` や `sprint-5.10.md` のような
 小数IDは作りません。合格済みスプリントへの軽微な追加調整は、ユーザーが明示しなくても
-`sprint-005-patch-001.md` のような Patch Sprint として切ります。
+`sprint-005-patch-001.md` のような Patch Sprint として切ります。同一画面・同一導線に閉じ、
+自動回帰チェックが既にある軽微変更は `Type: micro` として軽量評価（機能完全性・動作安定性・
+回帰なしのみ採点）で回せます。
 
 ## 設計原則（一次情報に基づく）
 
@@ -114,9 +124,14 @@ Planner ──→ Generator ──→ Evaluator
 2. **ファイルで受け渡す** — spec index / spec details / sprint contract → progress → feedback。
    セッションをまたいでも状態が残り、過去スプリント判断が現在の正本を肥大化させない。
 3. **生成と評価を分離（GAN）** — 自己評価は甘くなる。独立した懐疑的な評価器がループを締める。
-4. **閾値で合否・苦手を重く** — 各基準に閾値。モデルが苦手なデザイン性・独自性を重く見る。
-5. **実際に動かして検証** — コードを読むだけにせず、利用可能なブラウザ検証面で操作してから採点する。
+4. **閾値で合否・苦手を重く** — 閾値の正本は `docs/spec/rubric.md`。プロジェクト種別に応じて
+   Planner が調整し、モデルが苦手なデザイン性・独自性を重く見る。
+5. **実際に動かして検証・証跡を残す** — コードを読むだけにせず、利用可能なブラウザ検証面で
+   操作してから採点する。証跡（コマンド結果・実操作の記録・視覚評価時のスクリーンショット）の
+   無い合格は無効。
 6. **作る前に合意 / 完了前に検証** — brainstorm-before-build と verification-before-completion。
+7. **回帰を資産化する** — 合格した受け入れ基準は Generator が自動チェックとして回帰スイートに
+   積み、Evaluator はスイート実行＋新規面の実操作確認に集中する。
 
 ## ブラウザ検証の方針
 
@@ -124,7 +139,8 @@ Evaluator は環境ごとのネイティブな検証面を優先します。
 
 1. **Codex App:** Browser Use / `@Browser`
 2. **Claude Code Desktop App:** Preview pane / autoVerify
-3. **Codex CLI / Claude Code CLI:** Playwright test / Playwright script / Playwright MCP
+3. **Codex CLI / Claude Code CLI:** Playwright test / Playwright script。Playwright MCP は
+   ホスト側に既設の場合のみ使い、ハーネスからは常時起動しない
 4. **例外:** Computer Use や実 Chrome は、ログイン済みブラウザ状態や GUI 専用操作が必要なときだけ
 5. **Fallback:** build、HTTP 疎通、静的スクリーンショット、手動確認項目を feedback に残す
 

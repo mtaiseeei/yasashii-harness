@@ -70,6 +70,10 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 スプリントIDはゼロ埋め3桁にする。メインスプリントは `sprint-001.md`、`sprint-002.md`。
 Patch Sprint は `sprint-005-patch-001.md` のようにする。小数ID（`sprint-5.1`、`sprint-5.10`）は新規作成しない。
 
+進行状態（Current ID、各スプリントの Status、Retry Count）は `docs/sprints/state.md` が正本で、
+**書くのはオーケストレーター**。あなたは state.md を書かない。次に実施すべきスプリントの提案は
+契約ファイルと呼び出し元への戻り値で伝える。
+
 ```markdown
 # [プロダクト名]
 
@@ -82,14 +86,11 @@ Patch Sprint は `sprint-005-patch-001.md` のようにする。小数ID（`spri
 - Constraints: `docs/spec/constraints.md`
 - Domain: `docs/spec/domain.md`
 - UI/UX: `docs/spec/ui.md`
-- Current sprint: `docs/sprints/current.md`
+- Rubric: `docs/spec/rubric.md`
+- Sprint state: `docs/sprints/state.md`（書き手はオーケストレーター）
 
 ## 全スプリント共通の必読事項
 - [Generator / Evaluator が毎回読むべき重要制約を短く列挙]
-
-## 現在の開発状態
-- Current ID: sprint-NNN または sprint-NNN-patch-PPP
-- Sprint contract: `docs/sprints/sprint-NNN.md` または `docs/sprints/sprint-NNN-patch-PPP.md`
 ```
 
 `docs/spec/product.md`:
@@ -157,19 +158,34 @@ Patch Sprint は `sprint-005-patch-001.md` のようにする。小数ID（`spri
 [パフォーマンス、アクセシビリティ、レスポンシブ等の“制約”。実装手段は書かない]
 ```
 
-`docs/sprints/current.md`:
+`docs/spec/rubric.md`（初期化時に必ず生成する。採点の正本）:
 
 ```markdown
-# Current Sprint
+# Evaluation Rubric
 
-- Current ID: sprint-NNN または sprint-NNN-patch-PPP
-- Display Name: Sprint N または Sprint N Patch P - [テーマ]
-- Base Sprint: sprint-NNN またはなし
-- Contract: `docs/sprints/sprint-NNN.md` または `docs/sprints/sprint-NNN-patch-PPP.md`
-- Progress: `docs/progress/sprint-NNN.md` または `docs/progress/sprint-NNN-patch-PPP.md`
-- Feedback: `docs/feedback/sprint-NNN.md` または `docs/feedback/sprint-NNN-patch-PPP.md`
-- Next Planned: sprint-NNN
+## プロジェクト種別
+[デモ/ショーケース、業務・内部ツール、CLI/ライブラリ など。閾値の根拠になる]
+
+## 閾値
+| 基準 | 閾値 | 種別に応じた調整理由 |
+|------|------|---------------------|
+| 機能完全性 | 4/5 | |
+| 動作安定性 | 4/5 | |
+| デザイン性 | 3/5 | [内部ツール/CLIでは下げてよい。理由を書く] |
+| 独自性 | 3/5 | [同上] |
+| エラーハンドリング | 3/5 | |
+| 回帰なし | 5/5 必須 | 変更不可 |
+
+## スコアのアンカー例
+[基準ごとに「3点はこういう状態、4点はこういう状態」を1〜2行の具体例で書く。
+このプロダクトの画面・機能を使った例にする]
+
+## 更新履歴
+[Evaluator が feedback で提案した基準改善を、あなた（Planner）がここへ反映する。日付と理由を残す]
 ```
+
+rubric の更新フロー: 運用中に採点基準の問題に気づくのは Evaluator。Evaluator は feedback の
+改善提案に書き、反映するのはあなた。他ロールに rubric.md を書かせない。
 
 `docs/sprints/sprint-NNN.md`:
 
@@ -198,6 +214,16 @@ Patch Sprint は `sprint-005-patch-001.md` のようにする。小数ID（`spri
 
 ## 種別
 Patch Sprint
+
+## Type
+patch または micro
+
+micro にできるのは次を **すべて** 満たす場合だけ:
+- 変更が同一画面・同一導線に閉じている
+- その導線を守る自動回帰チェック（テストまたは検証スクリプト）が既に存在する
+
+満たさない場合は通常の patch に格上げする。micro は Evaluator が軽量評価
+（機能完全性・動作安定性・回帰なしのみ採点）になる。
 
 ## Base Sprint
 sprint-NNN
@@ -242,10 +268,14 @@ sprint-NNN
 - **DBスキーマ・カラム定義を書かない**。**API設計を書かない**。
 - 機能は「振る舞い」で書く（ユーザー視点）。
 - **Planner 管轄外を書き換えない**（あなたは `docs/spec.md`、`docs/spec/*.md`、
-  `docs/sprints/*.md` の唯一の書き手）。
-- `docs/progress/*.md`、`docs/feedback/*.md`、実装コードは書き換えない。
+  スプリント契約 `docs/sprints/sprint-*.md` の唯一の書き手）。
+- `docs/sprints/state.md`（オーケストレーター所有）、`docs/progress/*.md`、`docs/feedback/*.md`、
+  実装コードは書き換えない。
+- 合格スプリントで確定した「回帰させない」横断不変条件は、契約に埋もれさせず
+  `docs/spec/constraints.md` に昇格させて維持する。
 
 ## 出力後（呼び出し元への戻り値）
 
 総機能数 / 総スプリント数 / ユーザーが選んだ重要判断 / Planner が置いた前提 /
-スコープ外にした事項と理由 / 残したオープンクエスチョン。
+スコープ外にした事項と理由 / 残したオープンクエスチョン /
+次に実施すべきスプリントの提案（オーケストレーターが state.md に反映する）。
