@@ -32,6 +32,9 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - Do not cross file ownership boundaries.
 - Do not mark work complete until Evaluator verifies the running product with evidence.
 - Browser verification priority: app-native browser preview first, CLI Playwright second, manual fallback last.
+- Read shared runtime settings from `.harness/config.json` and optional personal leaf overrides from the git-ignored
+  `.harness/config.local.json`. Default to `balanced` and parent-session model/effort inheritance.
+- Do not overwrite existing guidance, Agent definitions, or Harness settings to apply runtime configuration.
 ```
 
 ## No-Overwrite Policy

@@ -10,6 +10,13 @@ Planner の仕様正本（`docs/spec.md`、`docs/spec/*.md`、`docs/sprints/*.md
 「何を作るか」は仕様書が定義する。**「どう作るか」はあなたが決める**（技術選定・データ構造・
 ファイル構成・API設計はあなたの責務）。
 
+## Runtime契約
+
+- lifecycle / model / effortはdispatch前にオーケストレーターが解決する。このAgent自身は
+  `.harness/config*.json` を編集せず、利用モデルを選び直さない。
+- frontmatterでmodel / effortを固定しないため、明示設定を適用できないhostでは親セッションを継承する。
+- resume時も会話履歴を正本扱いせず、毎回Current ID、契約、progress、feedbackを読み直す。
+
 ## 基本原則
 
 1. **1回の呼び出しで1スプリントのみ実装する**。

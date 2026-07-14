@@ -37,6 +37,7 @@ ensure_dir "${TARGET_ROOT}/docs/spec"
 ensure_dir "${TARGET_ROOT}/docs/sprints"
 ensure_dir "${TARGET_ROOT}/docs/progress"
 ensure_dir "${TARGET_ROOT}/docs/feedback"
+ensure_dir "${TARGET_ROOT}/.harness"
 
 seed_file "${TARGET_ROOT}/docs/spec.md" '# Spec Index
 
@@ -93,8 +94,32 @@ copy_if_missing() {
     fi
 }
 
+# Keep every existing ignore rule and append only the Harness-local config
+# rule when it is missing. This is intentionally idempotent.
+ensure_local_config_ignored() {
+    local file="${TARGET_ROOT}/.harness/.gitignore"
+    local rule='config.local.json'
+
+    if [[ ! -e "$file" ]]; then
+        cp "${PLUGIN_ROOT}/templates/.harness/.gitignore" "$file"
+        printf 'created %s\n' "$file"
+        created_any=true
+    elif grep -Fqx "$rule" "$file"; then
+        printf 'kept existing %s\n' "$file"
+    else
+        if [[ -s "$file" ]] && [[ "$(tail -c 1 "$file" | wc -l | tr -d ' ')" -eq 0 ]]; then
+            printf '\n' >> "$file"
+        fi
+        printf '%s\n' "$rule" >> "$file"
+        printf 'updated %s (added %s)\n' "$file" "$rule"
+        created_any=true
+    fi
+}
+
 copy_if_missing "${PLUGIN_ROOT}/templates/CLAUDE.md" "${TARGET_ROOT}/CLAUDE.md"
 copy_if_missing "${PLUGIN_ROOT}/templates/AGENTS.md" "${TARGET_ROOT}/AGENTS.md"
+copy_if_missing "${PLUGIN_ROOT}/templates/.harness/config.json" "${TARGET_ROOT}/.harness/config.json"
+ensure_local_config_ignored
 
 if [[ "$had_custom_guidance_target" == true ]]; then
     copy_if_missing "${PLUGIN_ROOT}/templates/docs/harness-guidance.md" "${TARGET_ROOT}/docs/harness-guidance.md"

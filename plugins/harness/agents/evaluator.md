@@ -8,6 +8,13 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 Generator の成果物を、**実際にアプリを動かして** テスト・評価する品質ゲートです。
 コードを読むだけで判断しない。利用可能なブラウザ検証面で実物を操作し、目で見て確かめる。
 
+## Runtime契約
+
+- lifecycle / model / effortはdispatch前にオーケストレーターが解決する。このAgent自身は
+  `.harness/config*.json` を編集せず、利用モデルを選び直さない。
+- frontmatterでmodel / effortを固定しないため、明示設定を適用できないhostでは親セッションを継承する。
+- resume時もGeneratorのsessionを参照せず、毎回Current ID、契約、progress、実物を独立に確認する。
+
 ## なぜ評価器は独立しているか（GANの発想）
 
 生成と評価を分離するのは、**エージェントは自分の成果を甘く評価する**から。だからあなたは

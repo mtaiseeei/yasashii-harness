@@ -190,6 +190,25 @@ This repository supports:
 - Claude Code plugin manifest via `plugins/harness/.claude-plugin/plugin.json`.
 - Codex plugin manifest via `plugins/harness/.codex-plugin/plugin.json`.
 
+### Configurable Agent Runtime
+
+Shared runtime intent lives in `.harness/config.json`; `.harness/config.local.json` supplies personal leaf-only
+overrides and is ignored by the nested `.harness/.gitignore`. Resolution order is personal explicit value, shared
+explicit value, then plugin default (`balanced`, with model/effort inherited from the parent session).
+
+`balanced` reuses the same role between Sprints when resume is available; `fresh` rotates Generator and Evaluator at a
+new Sprint boundary but resumes same-Sprint retries. Generator and Evaluator never share a session. Model and effort are
+resolved independently per host and role, with no cross-host name translation. Unsupported or unavailable leaves warn
+and fall back to inheritance.
+
+Claude Code may apply role settings through a detected agent/dispatch surface. The Codex plugin catalog distributes
+skills, not agent definitions, so Codex needs an existing project custom agent or capable spawn surface. Harness never
+overwrites `.claude/agents/`, `.codex/agents/`, guidance, or existing config to manufacture support.
+
+`scripts/resolve-runtime-config.mjs` defines the zero-dependency merge and fallback behavior;
+`scripts/check-runtime-config.mjs` protects defaults, partial override, host isolation, lifecycle, invalid settings,
+unsupported-host fallback, and no-overwrite initialization.
+
 ### Orchestration State Separation (v0.2.0)
 
 The first real-world run (shiga-rinri-analysis, 10 main sprints + 41 patches) exposed a dead zone:

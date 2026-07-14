@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "lifecycle": "balanced",
+  "hosts": {
+    "claudeCode": {
+      "roles": {
+        "planner": {
+          "model": "inherit",
+          "effort": "inherit"
+        },
+        "generator": {
+          "model": "inherit",
+          "effort": "inherit"
+        },
+        "evaluator": {
+          "model": "inherit",
+          "effort": "inherit"
+        }
+      }
+    },
+    "codex": {
+      "roles": {
+        "planner": {
+          "model": "inherit",
+          "effort": "inherit"
+        },
+        "generator": {
+          "model": "inherit",
+          "effort": "inherit"
+        },
+        "evaluator": {
+          "model": "inherit",
+          "effort": "inherit"
+        }
+      }
+    }
+  }
+}

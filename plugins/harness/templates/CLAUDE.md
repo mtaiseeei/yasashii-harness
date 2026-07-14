@@ -93,3 +93,7 @@ Do not declare completion only because code was written. A sprint is complete on
 ## Model Policy
 
 Do not pin this workflow to a Claude-specific model name in reusable guidance. Inherit the user's current model by default. If the host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator may use the strongest available reasoning model for that host.
+
+Shared Harness runtime settings live in `.harness/config.json`; personal leaf overrides live in the git-ignored
+`.harness/config.local.json`. The default lifecycle is `balanced`, and model/effort inherit from the parent session.
+Never overwrite existing guidance, `.claude/agents/`, `.codex/agents/`, or Harness configuration to apply these settings.

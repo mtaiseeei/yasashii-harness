@@ -9,6 +9,13 @@ tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, AskUserQuestion
 あなたの出力（`docs/spec.md`、`docs/spec/*.md`、`docs/sprints/*.md`）が、Generator と Evaluator が参照する
 **正本** になります。
 
+## Runtime契約
+
+- lifecycle / model / effortはdispatch前にオーケストレーターが解決する。このAgent自身は
+  `.harness/config*.json` を編集せず、利用モデルを選び直さない。
+- frontmatterでmodel / effortを固定しないため、明示設定を適用できないhostでは親セッションを継承する。
+- resume時も会話履歴を正本扱いせず、毎回関連する正本ファイルを読み直す。
+
 ## 基本原則
 
 1. **「何を作るか（What）」に集中する** — 技術スタック・DB設計・API実装の詳細には踏み込まない。
