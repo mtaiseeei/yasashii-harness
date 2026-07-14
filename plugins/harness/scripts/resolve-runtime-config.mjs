@@ -73,11 +73,15 @@ function warning(code, configPath, reason, {
   input,
   candidates,
   causeSource,
+  line,
+  column,
 } = {}) {
   const item = { code, path: configPath, reason, effective, source };
   if (input !== undefined) item.input = input;
   if (Array.isArray(candidates) && candidates.length) item.candidates = candidates;
   if (causeSource) item.causeSource = causeSource;
+  if (Number.isInteger(line) && line > 0) item.line = line;
+  if (Number.isInteger(column) && column > 0) item.column = column;
   return item;
 }
 
@@ -96,6 +100,43 @@ function truncateDiagnosticText(value, maxLength) {
   }
   const suffix = `\n...[truncated ${value.length - prefixLength} characters]`;
   return `${value.slice(0, Math.max(0, maxLength - suffix.length))}${suffix}`;
+}
+
+function oversizedTomlInputMarker(length) {
+  return `[redacted oversized TOML input; size=${length} characters]`;
+}
+
+function tomlParseDiagnostic(error, { redactDetails }) {
+  const line = Number.isInteger(error?.line) && error.line > 0 ? error.line : undefined;
+  const column = Number.isInteger(error?.column) && error.column > 0 ? error.column : undefined;
+
+  let summary;
+  if (redactDetails) {
+    summary = "Invalid TOML document; source details redacted for oversized input";
+  } else {
+    let message = typeof error?.message === "string" ? error.message : "Invalid TOML document";
+    if (typeof error?.codeblock === "string" && error.codeblock) {
+      message = message.replace(error.codeblock, "");
+    }
+    message = message.replace(/```[\s\S]*?```/g, "");
+    summary = message.split(/\r?\n/).map((part) => part.trim()).find(Boolean)
+      || "Invalid TOML document";
+    summary = summary.replace(/\s+/g, " ");
+    if (!/^Invalid TOML document\b/.test(summary)) {
+      summary = `Invalid TOML document: ${summary}`;
+    }
+  }
+
+  const position = line && column
+    ? ` (line ${line}, column ${column})`
+    : line
+      ? ` (line ${line})`
+      : "";
+  return {
+    reason: truncateDiagnosticText(`${summary}${position}`, MAX_DIAGNOSTIC_REASON_LENGTH),
+    line,
+    column,
+  };
 }
 
 function readJson(file, label, source, warnings) {
@@ -125,9 +166,17 @@ function readToml(file, label, source, warnings) {
     }
     return value;
   } catch (error) {
-    const diagnosticInput = truncateDiagnosticText(input, MAX_DIAGNOSTIC_INPUT_LENGTH) ?? null;
-    const diagnosticReason = truncateDiagnosticText(error.message, MAX_DIAGNOSTIC_REASON_LENGTH);
-    warnings.push(warning("invalid-toml", label, diagnosticReason, { source, input: diagnosticInput }));
+    const oversized = typeof input === "string" && input.length > MAX_DIAGNOSTIC_INPUT_LENGTH;
+    const diagnosticInput = oversized
+      ? oversizedTomlInputMarker(input.length)
+      : input ?? null;
+    const diagnostic = tomlParseDiagnostic(error, { redactDetails: oversized });
+    warnings.push(warning("invalid-toml", label, diagnostic.reason, {
+      source,
+      input: diagnosticInput,
+      line: diagnostic.line,
+      column: diagnostic.column,
+    }));
     return null;
   }
 }

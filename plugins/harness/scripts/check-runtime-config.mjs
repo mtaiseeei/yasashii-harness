@@ -418,7 +418,12 @@ check("TOML syntax, type, and unknown-key errors are diagnosed with safe effecti
   assert.equal(invalidToml.effective, "inherit");
   assert.equal(invalidToml.input, brokenInput);
   assert.match(invalidToml.reason, /Invalid TOML document/);
+  assert.match(invalidToml.reason, /incomplete key-value/);
+  assert.match(invalidToml.reason, /line 2, column 2/);
   assert.doesNotMatch(invalidToml.reason, /truncated/);
+  assert.doesNotMatch(invalidToml.reason, /lifecycle = "fresh"/);
+  assert.equal(invalidToml.line, 2);
+  assert.equal(invalidToml.column, 2);
 
   const oversizedRoot = fixture();
   const oversizedFile = path.join(oversizedRoot, ".harness/config.local.toml");
@@ -434,8 +439,14 @@ check("TOML syntax, type, and unknown-key errors are diagnosed with safe effecti
   assert.equal(oversizedResult.lifecycle.mode, "fresh");
   assert.ok(oversizedWarning.input.length <= 4096);
   assert.ok(oversizedWarning.reason.length <= 1024);
-  assert.match(oversizedWarning.input, /\.\.\.\[truncated \d+ characters\]$/);
-  assert.match(oversizedWarning.reason, /\.\.\.\[truncated \d+ characters\]$/);
+  assert.equal(
+    oversizedWarning.input,
+    `[redacted oversized TOML input; size=${oversizedInput.length} characters]`,
+  );
+  assert.match(oversizedWarning.reason, /source details redacted for oversized input/);
+  assert.doesNotMatch(oversizedWarning.input, /truncated \d+ characters/);
+  assert.ok(Number.isInteger(oversizedWarning.line));
+  assert.ok(Number.isInteger(oversizedWarning.column));
   assert.doesNotMatch(oversizedWarning.input, new RegExp(tailSentinel));
   assert.doesNotMatch(oversizedWarning.reason, new RegExp(tailSentinel));
   assert.doesNotMatch(JSON.stringify(oversizedWarning), new RegExp(tailSentinel));
@@ -457,6 +468,76 @@ check("TOML syntax, type, and unknown-key errors are diagnosed with safe effecti
   assert.ok(typed.warnings.some((item) => item.code === "invalid-value" && item.input === 42));
   assert.ok(typed.warnings.some((item) => item.code === "unknown-config-key" && item.path.endsWith("unknownLeaf")));
   assert.ok(typed.warnings.some((item) => item.code === "unknown-config-key" && item.path.endsWith("mystery")));
+});
+
+check("oversized TOML diagnostics redact all content across resolver and CLI serialization", () => {
+  const variants = [
+    { seed: "alpha", normalValueAfterPadding: false },
+    { seed: "beta", normalValueAfterPadding: true },
+  ];
+
+  for (const { seed, normalValueAfterPadding } of variants) {
+    const root = fixture();
+    const sharedFile = path.join(root, ".harness/config.toml");
+    const normalValueMarker = `NORMAL_VALUE_${seed.toUpperCase()}_PRIVATE`;
+    const tailValueMarker = `TAIL_VALUE_${seed.toUpperCase()}_PRIVATE`;
+    const invalidFragmentMarker = `INVALID_FRAGMENT_${seed.toUpperCase()}_PRIVATE`;
+    const padding = Array.from(
+      { length: 280 },
+      (_, index) => `# padding-${seed}-${String(index).padStart(3, "0")}-${"x".repeat(12)}`,
+    );
+    const split = normalValueAfterPadding ? 220 : 0;
+    const lines = [
+      'lifecycle = "fresh"',
+      "[hosts.codex.roles.planner]",
+      ...padding.slice(0, split),
+      `model = "${normalValueMarker}"`,
+      ...padding.slice(split),
+      `effort = "${tailValueMarker}"`,
+      `broken = "${invalidFragmentMarker}`,
+    ];
+    const input = `${lines.join("\n")}\n`;
+    fs.mkdirSync(path.dirname(sharedFile), { recursive: true });
+    fs.writeFileSync(sharedFile, input);
+    assert.ok(input.length > 4096);
+
+    const result = resolveRuntimeConfig({ root, host: "codex" });
+    const diagnostic = result.warnings.find(
+      (item) => item.code === "invalid-toml" && item.source === "shared",
+    );
+    assert.ok(diagnostic);
+    assert.equal(result.lifecycle.mode, "balanced");
+    assert.equal(result.hosts.codex.roles.planner.model.effective, "inherit");
+    assert.equal(diagnostic.path, ".harness/config.toml");
+    assert.equal(diagnostic.effective, "inherit");
+    assert.equal(diagnostic.input, `[redacted oversized TOML input; size=${input.length} characters]`);
+    assert.match(diagnostic.reason, /Invalid TOML document/);
+    assert.match(diagnostic.reason, /source details redacted for oversized input/);
+    assert.match(diagnostic.reason, /line \d+, column \d+/);
+    assert.equal(diagnostic.line, lines.length);
+    assert.ok(Number.isInteger(diagnostic.column));
+    assert.ok(diagnostic.input.length <= 4096);
+    assert.ok(diagnostic.reason.length <= 1024);
+
+    const serializedWarning = JSON.stringify(diagnostic);
+    const serializedResult = JSON.stringify(result);
+    assert.ok(serializedWarning.length < 2048);
+    for (const marker of [normalValueMarker, tailValueMarker, invalidFragmentMarker]) {
+      assert.equal(diagnostic.input.includes(marker), false);
+      assert.equal(diagnostic.reason.includes(marker), false);
+      assert.equal(serializedWarning.includes(marker), false);
+      assert.equal(serializedResult.includes(marker), false);
+    }
+
+    const cli = runCli(["--root", root, "--host", "codex", "--json"]);
+    assert.equal(cli.status, 0, cli.stderr);
+    const cliResult = JSON.parse(cli.stdout);
+    assert.equal(cliResult.lifecycle.mode, "balanced");
+    assert.equal(cliResult.hosts.codex.roles.planner.model.effective, "inherit");
+    for (const marker of [normalValueMarker, tailValueMarker, invalidFragmentMarker]) {
+      assert.equal(cli.stdout.includes(marker), false);
+    }
+  }
 });
 
 check("legacy JSON is compatible alone, ignored beside TOML, and never leaf-merged into TOML", () => {

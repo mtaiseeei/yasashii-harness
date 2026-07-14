@@ -52,6 +52,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 ## Validation
 
+- Run the runtime configuration regression suite with `node plugins/harness/scripts/check-runtime-config.mjs`.
 - Check JSON manifests with `python3 -m json.tool`.
 - If available, run `claude plugin validate plugins/harness`.
 - For Codex, verify the local marketplace can install `harness@agentic-harness-local`.
