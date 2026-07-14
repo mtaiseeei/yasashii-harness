@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "ハーネス駆動開発プラグイン。短いアイデアから Planner → Generator → Evaluator の自律ループでアプリを作る。",
-    "version": "0.1.2"
+    "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
-      "description": "Planner / Generator / Evaluator loop with split specs, zero-padded sprint IDs, automatic patch sprints, and per-sprint progress.",
-      "version": "0.1.2",
+      "description": "Planner / Generator / Evaluator loop with configurable balanced/fresh agent runtime policy.",
+      "version": "0.3.0",
       "author": {
         "name": "taisei"
       },

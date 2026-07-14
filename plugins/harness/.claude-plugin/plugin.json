@@ -1,7 +1,7 @@
 {
   "name": "harness",
-  "description": "Planner / Generator / Evaluator loop with split specs, zero-padded sprint IDs, automatic patch sprints, and per-sprint progress.",
-  "version": "0.2.0",
+  "description": "Planner / Generator / Evaluator loop with configurable balanced/fresh agent runtime policy.",
+  "version": "0.3.0",
   "author": {
     "name": "taisei"
   },
