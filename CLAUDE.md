@@ -1,12 +1,12 @@
 # agentic-harness Development Guide
 
-This repository builds the `harness` plugin for Claude Code and Codex. The plugin turns a short product idea into a file-backed Planner -> Generator -> Evaluator loop.
+This repository builds the `harness` plugin for Claude Code and Codex. A short instruction is the entry point; the product's core value is keeping substantial development moving through separate Planner, Generator, and Evaluator roles, file-backed sources of truth, sprints, and independent evaluation.
 
 For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 
 ## Core Product
 
-- `Planner` expands a short idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files (including the scoring rubric `docs/spec/rubric.md`), and sprint contracts in `docs/sprints/`.
+- `Planner` expands a short new idea or the next step in an existing repository into a short `docs/spec.md` index, detailed `docs/spec/*.md` files (including the scoring rubric `docs/spec/rubric.md`), and sprint contracts in `docs/sprints/`.
 - Planner must first ask the user to choose major product direction with short multiple-choice questions when meaningful decisions are still open.
 - `Generator` implements one sprint at a time, grows an automated regression suite protecting accepted acceptance criteria, and updates the matching `docs/progress/sprint-*.md`.
 - `Evaluator` operates the running app, scores the sprint against the rubric with recorded evidence, and writes the matching `docs/feedback/sprint-*.md`. A pass without evidence is invalid.

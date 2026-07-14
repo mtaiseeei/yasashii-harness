@@ -30,7 +30,7 @@ escape_for_json() {
 
 content_escaped=$(escape_for_json "$using_harness_content")
 
-session_context="<IMPORTANT>\nThis project has agentic-harness available.\n\n**Below is your 'harness:using-harness' skill — the entry point to harness-driven development. When the user wants to build an app or a substantial feature, follow it and open the 'harness-loop' skill via the Skill tool.**\n\n${content_escaped}\n</IMPORTANT>"
+session_context="<IMPORTANT>\nThis project has agentic-harness available.\n\n**Below is your 'harness:using-harness' skill — the entry point for starting or continuing substantial, multi-sprint development. When the user wants to build a product, implement a substantial feature, or continue a Harness-managed repository, follow it and open the 'harness-loop' skill via the Skill tool.**\n\n${content_escaped}\n</IMPORTANT>"
 
 # Claude Code reads hookSpecificOutput.additionalContext (nested).
 printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"

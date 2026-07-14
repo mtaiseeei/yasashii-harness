@@ -1,7 +1,7 @@
 {
   "name": "agentic-harness-local",
   "interface": {
-    "displayName": "Agentic Harness Local"
+    "displayName": "Agentic Harness Local - Long-running development"
   },
   "plugins": [
     {

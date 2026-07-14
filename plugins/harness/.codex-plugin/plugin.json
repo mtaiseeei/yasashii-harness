@@ -1,7 +1,7 @@
 {
   "name": "harness",
   "version": "0.3.0",
-  "description": "Planner / Generator / Evaluator loop with configurable balanced/fresh agent runtime policy.",
+  "description": "A file-backed, multi-sprint harness for long-running development, with separate Planner, Generator, and Evaluator roles.",
   "author": {
     "name": "taisei",
     "url": "https://github.com/mtaiseeei"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Agentic Harness",
-    "shortDescription": "After installing, start with $using-harness or $harness-loop.",
-    "longDescription": "Agentic Harness turns a short product idea into a file-backed loop: Planner writes a short docs/spec.md index, detailed docs/spec/*.md files, zero-padded docs/sprints/sprint-NNN.md contracts, and automatic docs/sprints/sprint-NNN-patch-PPP.md patch contracts; Generator implements one sprint at a time and writes matching docs/progress/sprint-*.md files; Evaluator verifies the result before the next sprint.",
+    "shortDescription": "Keep long-running development moving through file-backed sprints and independent evaluation.",
+    "longDescription": "Agentic Harness starts from a short instruction and keeps substantial development moving across sessions. Three separate roles cover planning, generation, and independent evaluation; spec, sprint state, progress, and feedback files preserve the source of truth. When the host supports multiple agents, Harness uses them; otherwise it preserves role separation through independent work units. Use it for a new service, a business system, or the next sprint in an existing repository.",
     "developerName": "taisei",
     "category": "Productivity",
     "capabilities": [
@@ -29,8 +29,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use Agentic Harness to build a small web app.",
-      "Start a Planner -> Generator -> Evaluator loop."
+      "Use Agentic Harness to turn this short new-service idea into a file-backed, multi-sprint development plan and start the first sprint.",
+      "Continue this existing repository from docs/sprints/state.md with separate Planner, Generator, and Evaluator roles."
     ]
   }
 }
