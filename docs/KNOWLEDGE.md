@@ -6,7 +6,15 @@ For usage, see `README.md`. For the runtime loop, see `plugins/harness/skills/ha
 
 ## Summary
 
-Harness-driven development starts from a short idea and uses a Planner -> Generator -> Evaluator loop to build an application through file-backed handoffs.
+**A short instruction is the entry point. Keeping substantial development moving over time is the core product.**
+
+Harness-driven development connects product decisions, implementation, independent evaluation, and state transitions through
+three separate roles, file-backed sources of truth, and sprints. It can start from a short new idea or continue an existing
+repository from its recorded state. The input can be small while the work spans many decisions, sessions, and sprints.
+
+Planner, Generator, and Evaluator are three roles, not a promise that every host receives or launches exactly three Subagent
+instances. Harness uses multiple agents when the host provides a real dispatch surface; otherwise it runs one role per
+independent work unit. Generator and Evaluator remain separate in both modes.
 
 ```text
 Planner -> Generator -> Evaluator
@@ -16,6 +24,9 @@ Planner -> Generator -> Evaluator
 ```
 
 The central idea is adversarial separation: the agent that builds the product should not be the only judge of whether the product is good.
+
+This is not a guarantee of unattended completion, enterprise scale, duration, or quality. Important product decisions remain
+user-owned, every sprint crosses an evidence-backed evaluation gate, and three consecutive failures return to the user.
 
 ## Core Concepts
 
@@ -161,6 +172,31 @@ Learned pattern:
 
 ## Design Decisions In This Repository
 
+### Product Positioning: Short Entry, Long-Running Core
+
+The canonical message is: **"A short instruction is the entry point. Keeping substantial development moving over time is the core product."**
+
+Earlier install-facing copy over-emphasized turning a short idea into an app and described the system as "three agents." That
+framing made Harness sound like a one-shot generator and overstated what the Codex package distributes. The product is instead
+positioned around continuing development that is too substantial to finish safely in one implementation request: for example,
+a business system that is large for a small or midsize company, a new service built over multiple sprints, or long-term work in
+an existing repository.
+
+Short instructions remain important because they lower the cost of starting. Planner turns them into user-owned decisions,
+specification files, and sprint contracts; they do not limit the size of the resulting product. For an existing Harness-managed
+repository, the normal entry can instead be "continue from `docs/sprints/state.md`" or a request for the next sprint or patch.
+
+The durable product promise is role separation and file-backed continuity:
+
+- Planner owns product truth and sprint contracts.
+- Generator implements one sprint and grows regression protection.
+- Evaluator is independent from Generator and records evidence-backed pass/fail feedback.
+- The orchestrator records every transition before the loop moves on and routes implementation failures, specification
+  failures, and three-failure escalation to the appropriate owner.
+
+Runtime lifecycle and per-role model/effort configuration support this method, but they are operational controls rather than
+the top-level value proposition.
+
 ### Clean Plugin, No Sample App
 
 The repository is a reusable plugin, not a sample application. The plugin should fit into any target repository without carrying a demo app.
@@ -191,6 +227,10 @@ This repository supports:
 - Codex repo marketplace via `.agents/plugins/marketplace.json`.
 - Claude Code plugin manifest via `plugins/harness/.claude-plugin/plugin.json`.
 - Codex plugin manifest via `plugins/harness/.codex-plugin/plugin.json`.
+
+The same three-role method is preserved across hosts, but the execution surfaces are not treated as identical. Claude Code can
+use plugin role agents when its Subagent surface is available. Codex distribution carries skills rather than those role-agent
+definitions, so Codex uses an existing capable spawn surface when present and independent role work units otherwise.
 
 ### Configurable Agent Runtime
 
@@ -261,7 +301,8 @@ prefixes, and acceptance tags are opt-in.
 The Codex plugin catalog schema distributes `skills` only — no `agents` or `commands` keys (verified
 against the remote plugin catalog cache). Therefore `/harness` is Claude Code-only, and on hosts
 without subagent dispatch the loop runs through the fallback in `harness-loop`: one role per work
-unit, strict file ownership, and never reusing Generator's self-evaluation as the verdict.
+unit, strict file ownership, and never reusing Generator's self-evaluation as the verdict. Install-facing copy must therefore
+describe Planner, Generator, and Evaluator as roles and place any multiple-Agent claim next to this host-dependent fallback.
 
 ### Model Policy
 

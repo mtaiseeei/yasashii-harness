@@ -4,14 +4,14 @@
     "name": "taisei"
   },
   "metadata": {
-    "description": "ハーネス駆動開発プラグイン。短いアイデアから Planner → Generator → Evaluator の自律ループでアプリを作る。",
+    "description": "短い指示を入口に、3 role・ファイル正本・Sprint・独立評価で大きな開発を継続するハーネス駆動開発プラグイン。",
     "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
-      "description": "Planner / Generator / Evaluator loop with configurable balanced/fresh agent runtime policy.",
+      "description": "File-backed, multi-sprint harness for long-running development with separate Planner, Generator, and Evaluator roles.",
       "version": "0.3.0",
       "author": {
         "name": "taisei"
