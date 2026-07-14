@@ -79,15 +79,19 @@ Planner ──→ Generator ──→ Evaluator
 
 ## Agent runtime設定
 
-初期化時に、存在しない場合だけ `.harness/config.json` が作成されます。既定は `balanced` で、
+初期化時に、既存のTOML／旧JSON設定が無い場合だけ `.harness/config.toml` が作成されます。既定は `balanced` で、
 model / effortは親セッションを継承します。`fresh` にすると新Sprint境界でGeneratorとEvaluatorを
 fresh化し、同一Sprintの不合格修正はresumeします。GeneratorとEvaluatorはどちらのモードでも別Agentです。
 
 Claude Code / Codexごとの `planner` / `generator` / `evaluator` に `model` と `effort` を設定できます。
-個人差分はgit管理外の `.harness/config.local.json` に必要な項目だけ書き、共有設定の他項目を保持します。
+個人差分はgit管理外の `.harness/config.local.toml` に必要な項目だけ書き、共有設定の他項目を保持します。
 無効・利用不能・host未対応の値は、その項目だけ警告付きで `inherit` へ戻ります。
-正確なmodel ID / aliasは共有configの `references` にあるprovider公式情報で確認してください。前後空白以外を
+正確なmodel ID / aliasは共有TOMLの用途付き公式URLコメントで確認してください。前後空白以外を
 自動補正せず、曖昧なmodel名を候補へ変換することはありません。
+
+TOML parserはplugin内に固定版を同梱しているため、利用repoでpackage manifest、lockfile、`node_modules`を
+作ったり、`npm install`やnetwork accessを行ったりする必要はありません。旧 `config.json` / `config.local.json`
+だけのrepoは互換読込と移行warningで動作し、TOMLとの併存時はTOMLだけを正本として旧JSONをmergeしません。
 
 ```bash
 node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" --host claudeCode --event initial
@@ -185,7 +189,7 @@ Claude Desktop は Preview、CLI は Playwright に寄せます。
    入口説明を足す」だけで、リポジトリの `CLAUDE.md` は変更しません。
 2. **Codex:** Codex は plugin から `AGENTS.md` を上書きしません。代わりに `.codex-plugin/plugin.json`
    で `skills/` を配布し、Codex が skill の `name` / `description` を見て必要時に `SKILL.md` を読みます。
-3. **Harness 初期化:** 取り込み先に `CLAUDE.md` / `AGENTS.md` / `.harness/config.json` が無ければ `templates/` から生成します。
+3. **Harness 初期化:** 取り込み先に `CLAUDE.md` / `AGENTS.md` / Harness runtime設定が無ければ、`.harness/config.toml` などを `templates/` から生成します。
    会話起動でも `/harness` 起動でも同じ処理です。既に独自内容がある場合は上書きせず、
    `docs/harness-guidance.md` に追記候補だけを残します。既存Harness設定やAgent定義も変更しません。
 4. **なぜこの形か:** `CLAUDE.md` / `AGENTS.md` はプロジェクト固有の永続ルールです。ハーネスは

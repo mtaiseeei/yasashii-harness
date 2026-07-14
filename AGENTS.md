@@ -48,7 +48,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 - Keep install-facing text actionable: after installing, users should know they can just ask for an app, with `/harness <idea>` as an explicit shortcut.
 - The Planner question loop is mandatory for substantial builds. Do not collapse it into assumptions unless the user explicitly asks the agent to decide.
 - Do not hardcode Claude model names in reusable workflow files. Inherit host/user defaults unless the user opts into a stronger model.
-- Preserve zero-dependency distribution unless a dependency removes real operational risk.
+- Bundle required parser code and licenses inside the plugin so target repositories need no dependency installation.
 
 ## Validation
 

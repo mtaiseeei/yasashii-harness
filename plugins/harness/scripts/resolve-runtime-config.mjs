@@ -2,13 +2,19 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+const { parse: parseToml } = require("../vendor/smol-toml/index.cjs");
 
 const HOSTS = ["claudeCode", "codex"];
 const ROLES = ["planner", "generator", "evaluator"];
 const FIELDS = ["model", "effort"];
 const CAPABILITY_FLAGS = ["subagents", "resume", "roleModel", "roleEffort"];
 const CAPABILITY_LISTS = ["models", "efforts"];
+const MAX_DIAGNOSTIC_INPUT_LENGTH = 4096;
+const MAX_DIAGNOSTIC_REASON_LENGTH = 1024;
 
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
@@ -79,6 +85,19 @@ function own(object, key) {
   return Boolean(object && Object.prototype.hasOwnProperty.call(object, key));
 }
 
+function truncateDiagnosticText(value, maxLength) {
+  if (typeof value !== "string" || value.length <= maxLength) return value;
+  let prefixLength = maxLength;
+  for (let index = 0; index < 4; index += 1) {
+    const suffix = `\n...[truncated ${value.length - prefixLength} characters]`;
+    const nextPrefixLength = Math.max(0, maxLength - suffix.length);
+    if (nextPrefixLength === prefixLength) break;
+    prefixLength = nextPrefixLength;
+  }
+  const suffix = `\n...[truncated ${value.length - prefixLength} characters]`;
+  return `${value.slice(0, Math.max(0, maxLength - suffix.length))}${suffix}`;
+}
+
 function readJson(file, label, source, warnings) {
   if (!fs.existsSync(file)) return null;
   try {
@@ -92,6 +111,124 @@ function readJson(file, label, source, warnings) {
     warnings.push(warning("invalid-json", label, error.message, { source }));
     return null;
   }
+}
+
+function readToml(file, label, source, warnings) {
+  if (!fs.existsSync(file)) return null;
+  let input;
+  try {
+    input = fs.readFileSync(file, "utf8");
+    const value = parseToml(input);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      warnings.push(warning("invalid-config", label, "top level must be a TOML table", { source }));
+      return null;
+    }
+    return value;
+  } catch (error) {
+    const diagnosticInput = truncateDiagnosticText(input, MAX_DIAGNOSTIC_INPUT_LENGTH) ?? null;
+    const diagnosticReason = truncateDiagnosticText(error.message, MAX_DIAGNOSTIC_REASON_LENGTH);
+    warnings.push(warning("invalid-toml", label, diagnosticReason, { source, input: diagnosticInput }));
+    return null;
+  }
+}
+
+function validateConfig(config, label, source, warnings, { legacy = false } = {}) {
+  if (!config) return;
+  const inspectTable = (value, configPath, allowed) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      warnings.push(warning("invalid-config-type", configPath, "expected a table", {
+        source,
+        input: value,
+      }));
+      return false;
+    }
+    for (const key of Object.keys(value)) {
+      if (!allowed.includes(key)) {
+        warnings.push(warning("unknown-config-key", `${configPath}.${key}`, "unknown configuration key", {
+          source,
+          input: value[key],
+        }));
+      }
+    }
+    return true;
+  };
+
+  inspectTable(config, label, ["version", "lifecycle", "hosts", ...(legacy ? ["$comment", "references", "policy"] : [])]);
+  if (own(config, "version") && config.version !== 1) {
+    warnings.push(warning("invalid-config-value", `${label}.version`, "expected integer 1", {
+      source,
+      input: config.version,
+    }));
+  }
+  if (!own(config, "hosts")) return;
+  if (!inspectTable(config.hosts, `${label}.hosts`, HOSTS)) return;
+  for (const host of HOSTS) {
+    if (!own(config.hosts, host)) continue;
+    const hostValue = config.hosts[host];
+    if (!inspectTable(hostValue, `${label}.hosts.${host}`, ["roles"])) continue;
+    if (!own(hostValue, "roles")) continue;
+    if (!inspectTable(hostValue.roles, `${label}.hosts.${host}.roles`, ROLES)) continue;
+    for (const role of ROLES) {
+      if (!own(hostValue.roles, role)) continue;
+      inspectTable(hostValue.roles[role], `${label}.hosts.${host}.roles.${role}`, FIELDS);
+    }
+  }
+}
+
+function readConfigFamily(root, warnings) {
+  const harnessDir = path.join(root, ".harness");
+  const paths = {
+    sharedToml: path.join(harnessDir, "config.toml"),
+    personalToml: path.join(harnessDir, "config.local.toml"),
+    sharedJson: path.join(harnessDir, "config.json"),
+    personalJson: path.join(harnessDir, "config.local.json"),
+  };
+  const hasToml = fs.existsSync(paths.sharedToml) || fs.existsSync(paths.personalToml);
+  let shared;
+  let personal;
+  let format;
+
+  if (hasToml) {
+    format = "toml";
+    shared = readToml(paths.sharedToml, ".harness/config.toml", "shared", warnings);
+    personal = readToml(paths.personalToml, ".harness/config.local.toml", "personal", warnings);
+    for (const [kind, file, label] of [
+      ["shared", paths.sharedJson, ".harness/config.json"],
+      ["personal", paths.personalJson, ".harness/config.local.json"],
+    ]) {
+      if (fs.existsSync(file)) {
+        warnings.push(warning("legacy-json-ignored", label, "TOML configuration is present; legacy JSON is not merged", {
+          effective: "toml",
+          source: kind,
+          input: file,
+        }));
+      }
+    }
+  } else {
+    const hasLegacy = fs.existsSync(paths.sharedJson) || fs.existsSync(paths.personalJson);
+    format = hasLegacy ? "legacy-json" : "default";
+    shared = readJson(paths.sharedJson, ".harness/config.json", "shared", warnings);
+    personal = readJson(paths.personalJson, ".harness/config.local.json", "personal", warnings);
+    if (hasLegacy) {
+      for (const [kind, file, label] of [
+        ["shared", paths.sharedJson, ".harness/config.json"],
+        ["personal", paths.personalJson, ".harness/config.local.json"],
+      ]) {
+        if (fs.existsSync(file)) {
+          warnings.push(warning(
+            "legacy-json-config",
+            label,
+            "legacy JSON configuration was loaded for compatibility; migrate to .harness/config.toml and .harness/config.local.toml",
+            { effective: "legacy-json", source: kind, input: file },
+          ));
+        }
+      }
+    }
+  }
+
+  validateConfig(shared, format === "toml" ? ".harness/config.toml" : ".harness/config.json", "shared", warnings, { legacy: format === "legacy-json" });
+  validateConfig(personal, format === "toml" ? ".harness/config.local.toml" : ".harness/config.local.json", "personal", warnings, { legacy: format === "legacy-json" });
+  return { shared, personal, paths, format };
 }
 
 function explicitValue(config, host, role, field) {
@@ -336,10 +473,7 @@ export function resolveRuntimeConfig({
 } = {}) {
   const warnings = [...capabilityDiagnostics];
   const normalizedRotate = validateRotate(rotate);
-  const sharedPath = path.join(root, ".harness", "config.json");
-  const personalPath = path.join(root, ".harness", "config.local.json");
-  const shared = readJson(sharedPath, ".harness/config.json", "shared", warnings);
-  const personal = readJson(personalPath, ".harness/config.local.json", "personal", warnings);
+  const { shared, personal, paths, format } = readConfigFamily(root, warnings);
   const { capabilities, sources: capabilitySources } = normalizeCapabilities(
     capabilityOverrides,
     warnings,
@@ -416,8 +550,21 @@ export function resolveRuntimeConfig({
     version: 1,
     root,
     configFiles: {
-      shared: { path: sharedPath, present: fs.existsSync(sharedPath), valid: Boolean(shared) },
-      personal: { path: personalPath, present: fs.existsSync(personalPath), valid: Boolean(personal) },
+      format,
+      shared: {
+        path: format === "legacy-json" ? paths.sharedJson : paths.sharedToml,
+        present: fs.existsSync(format === "legacy-json" ? paths.sharedJson : paths.sharedToml),
+        valid: Boolean(shared),
+      },
+      personal: {
+        path: format === "legacy-json" ? paths.personalJson : paths.personalToml,
+        present: fs.existsSync(format === "legacy-json" ? paths.personalJson : paths.personalToml),
+        valid: Boolean(personal),
+      },
+      legacy: {
+        shared: { path: paths.sharedJson, present: fs.existsSync(paths.sharedJson) },
+        personal: { path: paths.personalJson, present: fs.existsSync(paths.personalJson) },
+      },
     },
     lifecycle: { mode: lifecycle.value, source: lifecycle.source, event, rotate: normalizedRotate },
     hosts: resolvedHosts,

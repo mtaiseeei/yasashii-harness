@@ -1,0 +1,51 @@
+# Agentic Harness runtime configuration shared by this repository.
+# Put personal leaf-only overrides in .harness/config.local.toml; that file is git-ignored.
+# Resolution order is: personal explicit leaf > shared explicit leaf > plugin default.
+#
+# lifecycle = "balanced" reuses the same role between Sprints when the host can resume it.
+# lifecycle = "fresh" starts fresh Generator and Evaluator work at a new Sprint boundary,
+# while a retry inside the same Sprint resumes the existing role when the host supports it.
+# Generator and Evaluator always remain separate roles/work units in both modes.
+#
+# model = "inherit" or effort = "inherit" means Harness passes no role override.
+# The role therefore inherits the model/effort of the parent main session—the current chat
+# running Harness—or the host default when that parent session has no explicit override.
+# If the host cannot apply a role override, Harness warns and safely falls back to inherit.
+# Model identifiers are trimmed only; ambiguous names are never fuzzy-matched, translated,
+# corrected, or automatically replaced with a candidate.
+#
+# Official references (use each URL for the stated purpose):
+# OpenAI API model IDs and capabilities: https://developers.openai.com/api/docs/models
+# Codex model availability: https://developers.openai.com/codex/models
+# Codex model/effort configuration: https://developers.openai.com/codex/config-reference
+# Codex subagent controls and limits: https://developers.openai.com/codex/subagents
+# Anthropic model IDs and capabilities: https://docs.anthropic.com/en/docs/about-claude/models/overview
+# Claude Code model selection/configuration: https://code.claude.com/docs/en/model-config
+# Claude Code subagent model controls: https://code.claude.com/docs/en/sub-agents
+
+version = 1
+lifecycle = "balanced"
+
+[hosts.claudeCode.roles.planner]
+model = "inherit"
+effort = "inherit"
+
+[hosts.claudeCode.roles.generator]
+model = "inherit"
+effort = "inherit"
+
+[hosts.claudeCode.roles.evaluator]
+model = "inherit"
+effort = "inherit"
+
+[hosts.codex.roles.planner]
+model = "inherit"
+effort = "inherit"
+
+[hosts.codex.roles.generator]
+model = "inherit"
+effort = "inherit"
+
+[hosts.codex.roles.evaluator]
+model = "inherit"
+effort = "inherit"

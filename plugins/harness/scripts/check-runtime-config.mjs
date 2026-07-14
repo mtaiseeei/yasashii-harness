@@ -5,9 +5,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.mjs";
+
+const require = createRequire(import.meta.url);
+const { parse: parseToml, stringify: stringifyToml } = require("../vendor/smol-toml/index.cjs");
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
@@ -42,6 +46,11 @@ if (process.env.HARNESS_RUNTIME_CLEANUP_PROBE === "fail") {
 function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeToml(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, stringifyToml(value));
 }
 
 function sha(file) {
@@ -90,25 +99,23 @@ function check(name, run) {
   checks.push({ name, run });
 }
 
-check("shared config is valid, self-describing JSON with official references", () => {
-  const template = path.join(pluginRoot, "templates/.harness/config.json");
-  const config = JSON.parse(fs.readFileSync(template, "utf8"));
-  assert.match(config.$comment, /never guessed|never converted/i);
+check("shared TOML is parseable and self-documents lifecycle, inheritance, fallback, and official references", () => {
+  const template = path.join(pluginRoot, "templates/.harness/config.toml");
+  const source = fs.readFileSync(template, "utf8");
+  const config = parseToml(source);
+  assert.match(source, /parent main session/i);
+  assert.match(source, /current chat/i);
+  assert.match(source, /never fuzzy-matched/i);
+  assert.match(source, /lifecycle = "balanced" reuses/i);
+  assert.match(source, /retry inside the same Sprint resumes/i);
   assert.equal(config.lifecycle, "balanced");
-  assert.deepEqual(Object.keys(config.references).sort(), [
-    "anthropicModels",
-    "claudeCodeModelConfig",
-    "claudeCodeSubagents",
-    "codexConfig",
-    "codexModels",
-    "codexSubagents",
-    "openaiApiModels",
-  ]);
-  for (const url of Object.values(config.references)) assert.match(url, /^https:\/\//);
+  assert.equal((source.match(/https:\/\//g) || []).length, 7);
+  assert.equal(JSON.stringify(config).includes("https://"), false);
   const root = fixture();
   fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
-  fs.copyFileSync(template, path.join(root, ".harness/config.json"));
+  fs.copyFileSync(template, path.join(root, ".harness/config.toml"));
   const resolved = resolveRuntimeConfig({ root });
+  assert.equal(resolved.configFiles.format, "toml");
   assert.equal(resolved.lifecycle.mode, "balanced");
   assert.equal(resolved.hosts.claudeCode.roles.planner.model.effective, "inherit");
 });
@@ -123,7 +130,7 @@ check("no config uses balanced plus inherit without overstating Claude effort", 
 
 check("personal leaves override shared leaves and explicit inherit cancels shared model", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     lifecycle: "fresh",
     hosts: {
       codex: {
@@ -134,7 +141,7 @@ check("personal leaves override shared leaves and explicit inherit cancels share
       },
     },
   });
-  writeJson(path.join(root, ".harness/config.local.json"), {
+  writeToml(path.join(root, ".harness/config.local.toml"), {
     hosts: { codex: { roles: { planner: { model: " inherit " } } } },
   });
   const result = resolveRuntimeConfig({ root, capabilityOverrides: completeCapabilities() });
@@ -148,7 +155,7 @@ check("personal leaves override shared leaves and explicit inherit cancels share
 
 check("model input is trimmed but never guessed; warnings identify source and candidates", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: {
       claudeCode: {
         roles: {
@@ -173,7 +180,7 @@ check("model input is trimmed but never guessed; warnings identify source and ca
 
 check("Claude role effort applies only with an explicit observed application path", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: { claudeCode: { roles: { planner: { effort: "high" } } } },
   });
   const unconfirmed = resolveRuntimeConfig({ root });
@@ -189,7 +196,7 @@ check("Claude role effort applies only with an explicit observed application pat
 
 check("host values stay isolated", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: {
       claudeCode: { roles: { evaluator: { model: "claude-team-model" } } },
       codex: { roles: { evaluator: { model: "codex-team-model" } } },
@@ -216,7 +223,7 @@ check("balanced, fresh, retry, rotation, and role identity contracts are explici
   assert.ok(evaluator.identity.mustNotShareWith.includes("generator"));
 
   const freshRoot = fixture();
-  writeJson(path.join(freshRoot, ".harness/config.json"), { lifecycle: "fresh" });
+  writeToml(path.join(freshRoot, ".harness/config.toml"), { lifecycle: "fresh" });
   const boundary = resolveRuntimeConfig({
     root: freshRoot, event: "sprint-change", capabilityOverrides: capabilities,
   });
@@ -235,7 +242,7 @@ check("balanced, fresh, retry, rotation, and role identity contracts are explici
 
 check("subagents false normalizes every new execution path to isolated-work-unit", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), { lifecycle: "fresh" });
+  writeToml(path.join(root, ".harness/config.toml"), { lifecycle: "fresh" });
   const capabilities = completeCapabilities();
   capabilities.claudeCode.subagents = false;
   for (const options of [
@@ -259,7 +266,7 @@ check("Codex conservative defaults use isolated work units and source-aware resu
 
 check("unsupported role settings warn and inherit", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: { codex: { roles: { planner: { model: "codex-team-model", effort: "high" } } } },
   });
   const result = resolveRuntimeConfig({ root, host: "codex" });
@@ -270,7 +277,7 @@ check("unsupported role settings warn and inherit", () => {
 
 check("capability CLI accepts a file and degrades broken files without stopping", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: { codex: { roles: { planner: { model: "codex-team-model" } } } },
   });
   const capabilityFile = path.join(root, "capabilities.json");
@@ -300,7 +307,7 @@ check("capability CLI accepts a file and degrades broken files without stopping"
 
 check("invalid application path leaves warn and fall back without erasing valid siblings", () => {
   const root = fixture();
-  writeJson(path.join(root, ".harness/config.json"), {
+  writeToml(path.join(root, ".harness/config.toml"), {
     hosts: {
       claudeCode: {
         roles: { planner: { model: "claude-team-model", effort: "high" } },
@@ -386,6 +393,119 @@ check("unknown rotate roles fail visibly", () => {
   assert.match(cli.stderr, /invalid --rotate role/);
 });
 
+check("all role agents protect canonical TOML and identify JSON only as legacy compatibility", () => {
+  for (const role of ["planner", "generator", "evaluator"]) {
+    const definition = fs.readFileSync(path.join(pluginRoot, `agents/${role}.md`), "utf8");
+    assert.match(definition, /\.harness\/config\.toml/);
+    assert.match(definition, /\.harness\/config\.local\.toml/);
+    assert.match(definition, /編集・上書きせず/);
+    assert.match(definition, /旧 `.harness\/config\.json` \/ `.harness\/config\.local\.json` もlegacy互換入力/);
+    assert.doesNotMatch(definition, /config\*\.json/);
+  }
+});
+
+check("TOML syntax, type, and unknown-key errors are diagnosed with safe effective values", () => {
+  const brokenRoot = fixture();
+  const broken = path.join(brokenRoot, ".harness/config.toml");
+  const brokenInput = 'lifecycle = "fresh"\n[hosts.codex.roles.planner\n';
+  fs.mkdirSync(path.dirname(broken), { recursive: true });
+  fs.writeFileSync(broken, brokenInput);
+  const brokenResult = resolveRuntimeConfig({ root: brokenRoot });
+  assert.equal(brokenResult.lifecycle.mode, "balanced");
+  const invalidToml = brokenResult.warnings.find((item) => item.code === "invalid-toml");
+  assert.equal(invalidToml.path, ".harness/config.toml");
+  assert.equal(invalidToml.source, "shared");
+  assert.equal(invalidToml.effective, "inherit");
+  assert.equal(invalidToml.input, brokenInput);
+  assert.match(invalidToml.reason, /Invalid TOML document/);
+  assert.doesNotMatch(invalidToml.reason, /truncated/);
+
+  const oversizedRoot = fixture();
+  const oversizedFile = path.join(oversizedRoot, ".harness/config.local.toml");
+  const tailSentinel = "UNREDACTED_TAIL_SENTINEL";
+  const oversizedInput = `[${"a".repeat(5000)}${tailSentinel}`;
+  fs.mkdirSync(path.dirname(oversizedFile), { recursive: true });
+  writeToml(path.join(oversizedRoot, ".harness/config.toml"), { lifecycle: "fresh" });
+  fs.writeFileSync(oversizedFile, oversizedInput);
+  const oversizedResult = resolveRuntimeConfig({ root: oversizedRoot });
+  const oversizedWarning = oversizedResult.warnings.find(
+    (item) => item.code === "invalid-toml" && item.source === "personal",
+  );
+  assert.equal(oversizedResult.lifecycle.mode, "fresh");
+  assert.ok(oversizedWarning.input.length <= 4096);
+  assert.ok(oversizedWarning.reason.length <= 1024);
+  assert.match(oversizedWarning.input, /\.\.\.\[truncated \d+ characters\]$/);
+  assert.match(oversizedWarning.reason, /\.\.\.\[truncated \d+ characters\]$/);
+  assert.doesNotMatch(oversizedWarning.input, new RegExp(tailSentinel));
+  assert.doesNotMatch(oversizedWarning.reason, new RegExp(tailSentinel));
+  assert.doesNotMatch(JSON.stringify(oversizedWarning), new RegExp(tailSentinel));
+
+  const typedRoot = fixture();
+  fs.mkdirSync(path.join(typedRoot, ".harness"), { recursive: true });
+  fs.writeFileSync(path.join(typedRoot, ".harness/config.toml"), [
+    'lifecycle = "unexpected"',
+    'mystery = true',
+    '[hosts.codex.roles.planner]',
+    'model = 42',
+    'unknownLeaf = "value"',
+    '',
+  ].join("\n"));
+  const typed = resolveRuntimeConfig({ root: typedRoot });
+  assert.equal(typed.lifecycle.mode, "balanced");
+  assert.equal(typed.hosts.codex.roles.planner.model.effective, "inherit");
+  assert.ok(typed.warnings.some((item) => item.code === "invalid-lifecycle" && item.input === "unexpected"));
+  assert.ok(typed.warnings.some((item) => item.code === "invalid-value" && item.input === 42));
+  assert.ok(typed.warnings.some((item) => item.code === "unknown-config-key" && item.path.endsWith("unknownLeaf")));
+  assert.ok(typed.warnings.some((item) => item.code === "unknown-config-key" && item.path.endsWith("mystery")));
+});
+
+check("legacy JSON is compatible alone, ignored beside TOML, and never leaf-merged into TOML", () => {
+  const legacyRoot = fixture();
+  writeJson(path.join(legacyRoot, ".harness/config.json"), {
+    lifecycle: "fresh",
+    hosts: { codex: { roles: { planner: { model: "codex-team-model" } } } },
+  });
+  const legacyDigest = sha(path.join(legacyRoot, ".harness/config.json"));
+  const legacy = resolveRuntimeConfig({ root: legacyRoot, capabilityOverrides: completeCapabilities() });
+  assert.equal(legacy.configFiles.format, "legacy-json");
+  assert.equal(legacy.lifecycle.mode, "fresh");
+  assert.equal(legacy.hosts.codex.roles.planner.model.effective, "codex-team-model");
+  assert.ok(legacy.warnings.some((item) => item.code === "legacy-json-config"));
+  assert.equal(sha(path.join(legacyRoot, ".harness/config.json")), legacyDigest);
+  const initializedLegacy = runInitializer(legacyRoot);
+  assert.equal(initializedLegacy.status, 0, initializedLegacy.stderr);
+  assert.match(initializedLegacy.stderr, /no competing TOML was created/);
+  assert.equal(fs.existsSync(path.join(legacyRoot, ".harness/config.toml")), false);
+  assert.equal(sha(path.join(legacyRoot, ".harness/config.json")), legacyDigest);
+
+  const coexistRoot = fixture();
+  writeToml(path.join(coexistRoot, ".harness/config.toml"), { lifecycle: "balanced" });
+  writeJson(path.join(coexistRoot, ".harness/config.json"), {
+    lifecycle: "fresh",
+    hosts: { codex: { roles: { planner: { model: "codex-team-model" } } } },
+  });
+  writeJson(path.join(coexistRoot, ".harness/config.local.json"), {
+    hosts: { codex: { roles: { planner: { effort: "high" } } } },
+  });
+  const coexist = resolveRuntimeConfig({ root: coexistRoot, capabilityOverrides: completeCapabilities() });
+  assert.equal(coexist.configFiles.format, "toml");
+  assert.equal(coexist.lifecycle.mode, "balanced");
+  assert.equal(coexist.hosts.codex.roles.planner.model.effective, "inherit");
+  assert.equal(coexist.hosts.codex.roles.planner.effort.effective, "inherit");
+  assert.equal(coexist.warnings.filter((item) => item.code === "legacy-json-ignored").length, 2);
+});
+
+check("vendored smol-toml is fixed, licensed, self-contained, and loadable without target dependencies", () => {
+  const vendor = path.join(pluginRoot, "vendor/smol-toml");
+  const readme = fs.readFileSync(path.join(vendor, "README.md"), "utf8");
+  assert.match(readme, /Version: 1\.7\.0 \(fixed\)/);
+  assert.match(readme, /Runtime dependencies: none/);
+  assert.match(readme, /Supported Node\.js: >=18/);
+  assert.match(fs.readFileSync(path.join(vendor, "LICENSE"), "utf8"), /Redistribution and use in source and binary forms/);
+  assert.equal(sha(path.join(vendor, "index.cjs")), "173006d8b690034d636c1af4dc6836db8dc6a708bcd4fea90c8d04ea250afa7d");
+  assert.deepEqual(parseToml('lifecycle = "balanced"\n'), { lifecycle: "balanced" });
+});
+
 check("initializer never overwrites guidance, agents, config, or complete ignore", () => {
   const root = fixture();
   fs.accessSync(initializer, fs.constants.X_OK);
@@ -395,8 +515,10 @@ check("initializer never overwrites guidance, agents, config, or complete ignore
     "CLAUDE.md": "custom claude guidance\n",
     ".claude/agents/custom.md": "custom claude agent\n",
     ".codex/agents/custom.toml": "custom codex agent\n",
+    ".harness/config.toml": 'lifecycle = "fresh"\ncustom = true\n',
+    ".harness/config.local.toml": '[hosts.codex.roles.planner]\nmodel = "inherit"\n',
     ".harness/config.json": '{"lifecycle":"fresh","custom":true}\n',
-    ".harness/.gitignore": "custom-local-name.json\nconfig.local.json\n",
+    ".harness/.gitignore": "custom-local-name.json\nconfig.local.toml\nconfig.local.json\n",
   };
   for (const [relative, content] of Object.entries(files)) {
     const file = path.join(root, relative);
@@ -406,6 +528,7 @@ check("initializer never overwrites guidance, agents, config, or complete ignore
   const before = Object.fromEntries(Object.keys(files).map((file) => [file, sha(path.join(root, file))]));
   const initialized = runInitializer(root);
   assert.equal(initialized.status, 0, initialized.stderr);
+  assert.match(initialized.stdout, /kept existing .*config\.toml/);
   for (const [relative, digest] of Object.entries(before)) {
     assert.equal(sha(path.join(root, relative)), digest, `${relative} was overwritten`);
   }
@@ -415,20 +538,25 @@ check("initializer creates shared config, preserves custom ignore rules, verifie
   const root = fixture();
   execFileSync("git", ["init", "-q"], { cwd: root });
   const ignore = path.join(root, ".harness/.gitignore");
-  const localConfig = path.join(root, ".harness/config.local.json");
+  const localConfig = path.join(root, ".harness/config.local.toml");
   const original = "custom-local-name.json\n# keep this project rule";
   fs.mkdirSync(path.dirname(ignore), { recursive: true });
   fs.writeFileSync(ignore, original);
-  fs.writeFileSync(localConfig, "{}\n");
+  fs.writeFileSync(localConfig, "# personal overrides\n");
 
   const first = runInitializer(root);
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout, /verified git ignore/);
   const afterFirst = fs.readFileSync(ignore, "utf8");
-  assert.equal(afterFirst, `${original}\nconfig.local.json\n`);
+  assert.equal(afterFirst, `${original}\nconfig.local.toml\nconfig.local.json\n`);
+  assert.equal(afterFirst.match(/^config\.local\.toml$/gm)?.length, 1);
   assert.equal(afterFirst.match(/^config\.local\.json$/gm)?.length, 1);
+  execFileSync("git", ["check-ignore", "-q", "--no-index", ".harness/config.local.toml"], { cwd: root });
   execFileSync("git", ["check-ignore", "-q", "--no-index", ".harness/config.local.json"], { cwd: root });
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, ".harness/config.json"), "utf8")).lifecycle, "balanced");
+  assert.equal(parseToml(fs.readFileSync(path.join(root, ".harness/config.toml"), "utf8")).lifecycle, "balanced");
+  assert.equal(fs.existsSync(path.join(root, "package.json")), false);
+  assert.equal(fs.existsSync(path.join(root, "package-lock.json")), false);
+  assert.equal(fs.existsSync(path.join(root, "node_modules")), false);
   assert.equal(fs.existsSync(path.join(root, ".harness/README.md")), false);
 
   const digest = sha(ignore);
@@ -446,14 +574,14 @@ check("initializer refuses symlink, directory, and unreadable ignore surfaces be
   const symlinkResult = runInitializer(symlinkRoot);
   assert.notEqual(symlinkResult.status, 0);
   assert.equal(fs.readFileSync(external, "utf8"), "owner-rule\n");
-  assert.equal(fs.existsSync(path.join(symlinkRoot, ".harness/config.json")), false);
+  assert.equal(fs.existsSync(path.join(symlinkRoot, ".harness/config.toml")), false);
   assert.equal(fs.existsSync(path.join(symlinkRoot, "docs")), false);
 
   const directoryRoot = fixture();
   fs.mkdirSync(path.join(directoryRoot, ".harness/.gitignore"), { recursive: true });
   const directoryResult = runInitializer(directoryRoot);
   assert.notEqual(directoryResult.status, 0);
-  assert.equal(fs.existsSync(path.join(directoryRoot, ".harness/config.json")), false);
+  assert.equal(fs.existsSync(path.join(directoryRoot, ".harness/config.toml")), false);
 
   const unreadableRoot = fixture();
   fs.mkdirSync(path.join(unreadableRoot, ".harness"), { recursive: true });
@@ -463,7 +591,7 @@ check("initializer refuses symlink, directory, and unreadable ignore surfaces be
   try {
     const unreadableResult = runInitializer(unreadableRoot);
     assert.notEqual(unreadableResult.status, 0);
-    assert.equal(fs.existsSync(path.join(unreadableRoot, ".harness/config.json")), false);
+    assert.equal(fs.existsSync(path.join(unreadableRoot, ".harness/config.toml")), false);
   } finally {
     fs.chmodSync(unreadable, 0o600);
   }

@@ -125,10 +125,10 @@ Status の語彙は次に限る:
   `templates/docs/harness-guidance.md` から作り、既存ガイダンスへの追記候補を残す。
 - Hook は永続ファイルを生成しない。生成はユーザーの会話が `using-harness` に該当した時、または
   `/harness` を明示実行した時だけ行う。
-- `.harness/config.json` が無ければ共有設定雛形を作る。既存の共有設定は編集しない。
-- 個人上書きは `.harness/config.local.json` に明示項目だけ置く。このファイルは
+- 既存のTOML／旧JSON設定が無ければ `.harness/config.toml` の共有設定雛形を作る。既存設定は編集しない。
+- 個人上書きは `.harness/config.local.toml` に明示項目だけ置く。このファイルは
   `.harness/.gitignore` でgit管理から除外する。既存の `.harness/.gitignore` がある場合は
-  独自内容をすべて保持し、不足している `config.local.json` 規則だけを追記する。
+  独自内容をすべて保持し、不足している新旧local設定の規則だけを追記する。
 
 **既存プロジェクトの移行**: state.md が無く `docs/sprints/current.md` がある場合、
 current.md の記述と `docs/sprints/` / `docs/progress/` / `docs/feedback/` の実ファイルから
@@ -153,8 +153,9 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host cl
 node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host codex --event sprint-change
 ```
 
-- 共有設定は `.harness/config.json`、個人設定は `.harness/config.local.json`。優先順位は
+- 共有設定は `.harness/config.toml`、個人設定は `.harness/config.local.toml`。優先順位は
   `個人の明示項目 > 共有の明示項目 > plugin既定` で、設定オブジェクト全体を置換しない。
+- TOMLが無く旧JSONだけがある場合は互換読込して移行warningを出す。TOMLがあれば旧JSONはmergeしない。
 - plugin既定は `lifecycle: balanced`、各host × roleの `model: inherit` / `effort: inherit`。
 - `--event` は初回 `initial`、新Sprintへの遷移 `sprint-change`、同一Sprintの不合格修正 `retry`。
 - capabilityの準備・更新・受け渡しはオーケストレーターの責務。Harness開始時とhost状態変更時に、

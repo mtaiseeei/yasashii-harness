@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Initialize Agentic Harness guidance in a target repository.
-# Existing guidance/config is never replaced. The only in-place addition is
-# the exact config.local.json ignore rule when a safe regular file is present.
+# Existing guidance/config is never replaced. The only in-place additions are
+# the exact current and legacy personal-config ignore rules when a safe regular file is present.
 
 set -euo pipefail
 
@@ -10,7 +10,7 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TARGET_ROOT="${1:-$(pwd)}"
 HARNESS_DIR="${TARGET_ROOT}/.harness"
 IGNORE_FILE="${HARNESS_DIR}/.gitignore"
-IGNORE_RULE='config.local.json'
+IGNORE_RULES=('config.local.toml' 'config.local.json')
 
 changed_any=false
 had_custom_guidance_target=false
@@ -39,9 +39,11 @@ preflight_runtime_paths() {
         if [[ ! -r "$IGNORE_FILE" ]]; then
             fail "${IGNORE_FILE} is not readable; no files were changed"
         fi
-        if ! grep -Fqx "$IGNORE_RULE" "$IGNORE_FILE" && [[ ! -w "$IGNORE_FILE" ]]; then
-            fail "${IGNORE_FILE} is not writable and lacks ${IGNORE_RULE}; no files were changed"
-        fi
+        for rule in "${IGNORE_RULES[@]}"; do
+            if ! grep -Fqx "$rule" "$IGNORE_FILE" && [[ ! -w "$IGNORE_FILE" ]]; then
+                fail "${IGNORE_FILE} is not writable and lacks ${rule}; no files were changed"
+            fi
+        done
     elif [[ -d "$HARNESS_DIR" ]] && [[ ! -w "$HARNESS_DIR" ]]; then
         fail "${HARNESS_DIR} is not writable; no files were changed"
     elif [[ ! -e "$HARNESS_DIR" ]] && [[ ! -w "$TARGET_ROOT" ]]; then
@@ -85,23 +87,32 @@ ensure_local_config_rule() {
         cp "${PLUGIN_ROOT}/templates/.harness/.gitignore" "$IGNORE_FILE"
         printf 'created %s\n' "$IGNORE_FILE"
         changed_any=true
-    elif grep -Fqx "$IGNORE_RULE" "$IGNORE_FILE"; then
-        printf 'kept existing %s\n' "$IGNORE_FILE"
     else
-        if [[ -s "$IGNORE_FILE" ]] && [[ "$(tail -c 1 "$IGNORE_FILE" | wc -l | tr -d ' ')" -eq 0 ]]; then
-            printf '\n' >> "$IGNORE_FILE"
+        local added=false
+        for rule in "${IGNORE_RULES[@]}"; do
+            if ! grep -Fqx "$rule" "$IGNORE_FILE"; then
+                if [[ -s "$IGNORE_FILE" ]] && [[ "$(tail -c 1 "$IGNORE_FILE" | wc -l | tr -d ' ')" -eq 0 ]]; then
+                    printf '\n' >> "$IGNORE_FILE"
+                fi
+                printf '%s\n' "$rule" >> "$IGNORE_FILE"
+                printf 'updated %s (added %s)\n' "$IGNORE_FILE" "$rule"
+                changed_any=true
+                added=true
+            fi
+        done
+        if [[ "$added" == false ]]; then
+            printf 'kept existing %s\n' "$IGNORE_FILE"
         fi
-        printf '%s\n' "$IGNORE_RULE" >> "$IGNORE_FILE"
-        printf 'updated %s (added %s)\n' "$IGNORE_FILE" "$IGNORE_RULE"
-        changed_any=true
     fi
 
     if git -C "$TARGET_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        if git -C "$TARGET_ROOT" check-ignore -q --no-index -- '.harness/config.local.json'; then
-            printf 'verified git ignore for %s\n' "${TARGET_ROOT}/.harness/config.local.json"
-        else
-            fail "git did not confirm .harness/config.local.json as ignored"
-        fi
+        for rule in "${IGNORE_RULES[@]}"; do
+            if git -C "$TARGET_ROOT" check-ignore -q --no-index -- ".harness/${rule}"; then
+                printf 'verified git ignore for %s\n' "${TARGET_ROOT}/.harness/${rule}"
+            else
+                fail "git did not confirm .harness/${rule} as ignored"
+            fi
+        done
     else
         printf 'warning: ignore rule installed but git verification skipped (target is not a git worktree)\n' >&2
     fi
@@ -162,7 +173,13 @@ fi
 
 copy_if_missing "${PLUGIN_ROOT}/templates/CLAUDE.md" "${TARGET_ROOT}/CLAUDE.md"
 copy_if_missing "${PLUGIN_ROOT}/templates/AGENTS.md" "${TARGET_ROOT}/AGENTS.md"
-copy_if_missing "${PLUGIN_ROOT}/templates/.harness/config.json" "${TARGET_ROOT}/.harness/config.json"
+if [[ -e "${TARGET_ROOT}/.harness/config.toml" ]]; then
+    printf 'kept existing %s\n' "${TARGET_ROOT}/.harness/config.toml"
+elif [[ -e "${TARGET_ROOT}/.harness/config.json" ]] || [[ -e "${TARGET_ROOT}/.harness/config.local.json" ]]; then
+    printf 'warning: kept legacy Harness JSON config; migrate manually to .harness/config.toml and .harness/config.local.toml (no competing TOML was created)\n' >&2
+else
+    copy_if_missing "${PLUGIN_ROOT}/templates/.harness/config.toml" "${TARGET_ROOT}/.harness/config.toml"
+fi
 
 if [[ "$had_custom_guidance_target" == true ]]; then
     copy_if_missing "${PLUGIN_ROOT}/templates/docs/harness-guidance.md" "${TARGET_ROOT}/docs/harness-guidance.md"

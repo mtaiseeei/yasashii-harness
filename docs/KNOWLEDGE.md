@@ -155,7 +155,7 @@ https://github.com/obra/superpowers
 Learned pattern:
 
 - A SessionStart hook can inject an entry skill as additional context in Claude Code.
-- Keep the methodology zero-dependency.
+- Keep target repositories install-free by bundling required parser code and licenses inside the plugin.
 - Use brainstorm -> plan -> execute -> verify.
 - Support multiple host ecosystems without coupling to another plugin.
 
@@ -177,9 +177,11 @@ Instead:
 - `/harness` initialization may generate guidance files only when they do not already exist.
 - If custom guidance files exist, harness initialization writes `docs/harness-guidance.md` with a suggested block.
 
-### Zero-Dependency By Default
+### No Target-Repository Dependency Installation
 
-The core method should not require another plugin. Playwright is a CLI verification fallback, not a hard runtime dependency for every host.
+The core method does not require another plugin. Its TOML parser is fixed and bundled inside this plugin, so target
+repositories need no package manifest, lockfile, `node_modules`, package-manager run, or network access. Playwright is
+a CLI verification fallback, not a hard runtime dependency for every host.
 
 ### Multi-Host Support
 
@@ -192,7 +194,7 @@ This repository supports:
 
 ### Configurable Agent Runtime
 
-Shared runtime intent lives in `.harness/config.json`; `.harness/config.local.json` supplies personal leaf-only
+Shared runtime intent lives in `.harness/config.toml`; `.harness/config.local.toml` supplies personal leaf-only
 overrides and is ignored by the nested `.harness/.gitignore`. Resolution order is personal explicit value, shared
 explicit value, then plugin default (`balanced`, with model/effort inherited from the parent session).
 
@@ -201,9 +203,14 @@ new Sprint boundary but resumes same-Sprint retries. Generator and Evaluator nev
 resolved independently per host and role, with no cross-host name translation. Unsupported or unavailable leaves warn
 and fall back to inheritance.
 
-The shared JSON is self-describing through ignored `$comment`, `policy`, and `references` fields. Model input is only
-trimmed; the resolver never fuzzy-matches or translates an ambiguous name. Confirmed candidates may appear in a
-warning, but are never selected automatically.
+The shared TOML is self-describing through ordinary comments, including lifecycle semantics, parent-main-session
+inheritance, fallback policy, and purpose-labelled official URLs. Comments never enter the resolved data. Model input
+is only trimmed; the resolver never fuzzy-matches or translates an ambiguous name. Confirmed candidates may appear in
+a warning, but are never selected automatically.
+
+Legacy `.harness/config.json` and `.harness/config.local.json` remain read-compatible when no TOML config exists and
+produce a migration warning. If either TOML config exists, TOML is canonical and legacy JSON is diagnosed but never
+merged. The initializer does not create competing TOML in a repository that still contains legacy JSON.
 
 Claude Code exposes a subagent model control, while role effort requires a concrete agent-definition frontmatter or
 another explicitly observed role-level application path. The default Claude Code `roleEffort` capability is therefore
@@ -216,7 +223,7 @@ JSON file with `--capabilities <file>`; unknown fields stay null or omitted. Ava
 `applicationPaths` are separate evidence. Missing, malformed, or mistyped capability files produce warnings and
 conservative inheritance rather than a false applied state.
 
-`scripts/resolve-runtime-config.mjs` defines the zero-dependency merge and fallback behavior;
+`scripts/resolve-runtime-config.mjs` loads the bundled `smol-toml@1.7.0` parser and defines merge/fallback behavior;
 `scripts/check-runtime-config.mjs` protects defaults, partial override, host isolation, lifecycle, invalid settings,
 unsupported-host fallback, and no-overwrite initialization.
 
