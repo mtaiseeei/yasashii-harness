@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const HOSTS = ["claudeCode", "codex"];
 const ROLES = ["planner", "generator", "evaluator"];
 const FIELDS = ["model", "effort"];
+const CAPABILITY_FLAGS = ["subagents", "resume", "roleModel", "roleEffort"];
+const CAPABILITY_LISTS = ["models", "efforts"];
 
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
@@ -28,20 +30,30 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     subagents: true,
     resume: true,
     roleModel: true,
-    roleEffort: true,
+    // Claude Code effort is applied through agent-definition frontmatter, not
+    // a generic per-dispatch control. Keep it unconfirmed until the active
+    // project/host exposes a concrete role-level application path.
+    roleEffort: null,
     models: null,
     efforts: null,
+    applicationPaths: {
+      roleModel: "Claude Code subagent model control",
+      roleEffort: null,
+    },
   },
   codex: {
-    // Codex can use project custom agents, but the Codex plugin manifest does
-    // not distribute them. The runtime must opt in after detecting a usable
-    // project/host agent surface.
+    // The Codex plugin manifest distributes skills, not agent definitions.
+    // A project custom agent or capable spawn surface must opt in explicitly.
     subagents: null,
     resume: null,
     roleModel: false,
     roleEffort: false,
     models: null,
     efforts: null,
+    applicationPaths: {
+      roleModel: null,
+      roleEffort: null,
+    },
   },
 });
 
@@ -49,27 +61,37 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function warning(code, configPath, reason, effective = "inherit") {
-  return { code, path: configPath, reason, effective };
-}
-
-function readJson(file, label, warnings) {
-  if (!fs.existsSync(file)) return null;
-  try {
-    const value = JSON.parse(fs.readFileSync(file, "utf8"));
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      warnings.push(warning("invalid-config", label, "top level must be an object"));
-      return null;
-    }
-    return value;
-  } catch (error) {
-    warnings.push(warning("invalid-json", label, error.message));
-    return null;
-  }
+function warning(code, configPath, reason, {
+  effective = "inherit",
+  source = "plugin",
+  input,
+  candidates,
+  causeSource,
+} = {}) {
+  const item = { code, path: configPath, reason, effective, source };
+  if (input !== undefined) item.input = input;
+  if (Array.isArray(candidates) && candidates.length) item.candidates = candidates;
+  if (causeSource) item.causeSource = causeSource;
+  return item;
 }
 
 function own(object, key) {
   return Boolean(object && Object.prototype.hasOwnProperty.call(object, key));
+}
+
+function readJson(file, label, source, warnings) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const value = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      warnings.push(warning("invalid-config", label, "top level must be an object", { source }));
+      return null;
+    }
+    return value;
+  } catch (error) {
+    warnings.push(warning("invalid-json", label, error.message, { source }));
+    return null;
+  }
 }
 
 function explicitValue(config, host, role, field) {
@@ -85,29 +107,137 @@ function chooseValue(personal, shared, host, role, field) {
   return { value: "inherit", source: "plugin" };
 }
 
-function validRuntimeValue(value) {
-  return typeof value === "string" && value.trim().length > 0;
+function normalizeRuntimeValue(value) {
+  return typeof value === "string" ? value.trim() : value;
 }
 
-function normalizeCapabilities(overrides = {}) {
+function capabilityPayload(overrides) {
+  return overrides && typeof overrides === "object" && !Array.isArray(overrides) && own(overrides, "hosts")
+    ? overrides.hosts
+    : overrides;
+}
+
+function normalizeCapabilities(overrides, warnings, capabilitySource) {
   const capabilities = clone(DEFAULT_CAPABILITIES);
+  const sources = Object.fromEntries(
+    HOSTS.map((host) => [
+      host,
+      Object.fromEntries(
+        [...CAPABILITY_FLAGS, ...CAPABILITY_LISTS, "applicationPaths"].map((key) => [key, "plugin"]),
+      ),
+    ]),
+  );
+  const payload = capabilityPayload(overrides);
+
+  if (payload === undefined || payload === null) return { capabilities, sources };
+  if (typeof payload !== "object" || Array.isArray(payload)) {
+    warnings.push(warning("invalid-capabilities", "capabilities", "capability top level must be an object", {
+      source: capabilitySource,
+      causeSource: "capability",
+    }));
+    return { capabilities, sources };
+  }
+
   for (const host of HOSTS) {
-    const override = overrides?.[host];
-    if (!override || typeof override !== "object") continue;
-    for (const key of ["subagents", "resume", "roleModel", "roleEffort", "models", "efforts"]) {
-      if (own(override, key)) capabilities[host][key] = override[key];
+    if (!own(payload, host)) continue;
+    const override = payload[host];
+    if (!override || typeof override !== "object" || Array.isArray(override)) {
+      warnings.push(warning("invalid-capability-host", `capabilities.${host}`, "host capability must be an object", {
+        source: capabilitySource,
+        causeSource: "capability",
+      }));
+      for (const key of CAPABILITY_FLAGS) capabilities[host][key] = null;
+      continue;
+    }
+
+    for (const key of CAPABILITY_FLAGS) {
+      if (!own(override, key)) continue;
+      const value = override[key];
+      if (value === true || value === false || value === null) {
+        capabilities[host][key] = value;
+        sources[host][key] = capabilitySource;
+      } else {
+        capabilities[host][key] = null;
+        sources[host][key] = capabilitySource;
+        warnings.push(warning("invalid-capability-value", `capabilities.${host}.${key}`, "expected true, false, or null", {
+          source: capabilitySource,
+          input: value,
+          causeSource: "capability",
+        }));
+      }
+    }
+
+    for (const key of CAPABILITY_LISTS) {
+      if (!own(override, key)) continue;
+      const value = override[key];
+      if (value === null) {
+        capabilities[host][key] = null;
+        sources[host][key] = capabilitySource;
+      } else if (Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim())) {
+        capabilities[host][key] = value.map((item) => item.trim());
+        sources[host][key] = capabilitySource;
+      } else {
+        capabilities[host][key] = null;
+        sources[host][key] = capabilitySource;
+        warnings.push(warning("invalid-capability-value", `capabilities.${host}.${key}`, "expected null or an array of non-empty strings", {
+          source: capabilitySource,
+          input: value,
+          causeSource: "capability",
+        }));
+      }
+    }
+
+    if (own(override, "applicationPaths")) {
+      const value = override.applicationPaths;
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        for (const key of ["roleModel", "roleEffort"]) {
+          if (!own(value, key)) continue;
+          const pathValue = value[key];
+          if (pathValue === null) {
+            capabilities[host].applicationPaths[key] = null;
+          } else if (typeof pathValue === "string" && pathValue.trim()) {
+            capabilities[host].applicationPaths[key] = pathValue.trim();
+          } else {
+            capabilities[host].applicationPaths[key] = null;
+            warnings.push(warning(
+              "invalid-capability-value",
+              `capabilities.${host}.applicationPaths.${key}`,
+              "expected null or a non-empty string",
+              {
+                source: capabilitySource,
+                input: pathValue,
+                causeSource: capabilitySource,
+              },
+            ));
+          }
+        }
+        sources[host].applicationPaths = capabilitySource;
+      } else {
+        capabilities[host].applicationPaths = { roleModel: null, roleEffort: null };
+        sources[host].applicationPaths = capabilitySource;
+        warnings.push(warning("invalid-capability-value", `capabilities.${host}.applicationPaths`, "expected an object", {
+          source: capabilitySource,
+          input: value,
+          causeSource: "capability",
+        }));
+      }
     }
   }
-  return capabilities;
+
+  return { capabilities, sources };
 }
 
-function resolveField({ host, role, field, selected, capabilities, warnings }) {
+function resolveField({ host, role, field, selected, capabilities, capabilitySources, warnings }) {
   const configPath = `hosts.${host}.roles.${role}.${field}`;
-  const requested = selected.value;
+  const rawRequested = selected.value;
+  const requested = normalizeRuntimeValue(rawRequested);
 
-  if (!validRuntimeValue(requested)) {
-    warnings.push(warning("invalid-value", configPath, "value must be a non-empty string"));
-    return { requested, effective: "inherit", source: "fallback", status: "fallback" };
+  if (typeof requested !== "string" || requested.length === 0) {
+    warnings.push(warning("invalid-value", configPath, "value must be a non-empty string", {
+      source: selected.source,
+      input: rawRequested,
+    }));
+    return { requested, effective: "inherit", source: "fallback", inputSource: selected.source, status: "fallback" };
   }
   if (requested === "inherit") {
     return { requested, effective: "inherit", source: selected.source, status: "inherited" };
@@ -115,80 +245,119 @@ function resolveField({ host, role, field, selected, capabilities, warnings }) {
 
   const supportedKey = field === "model" ? "roleModel" : "roleEffort";
   const availableKey = field === "model" ? "models" : "efforts";
+  const applicationPath = capabilities.applicationPaths?.[supportedKey];
   if (capabilities[supportedKey] === false) {
-    warnings.push(
-      warning(
-        "unsupported-role-setting",
-        configPath,
-        `${host} cannot apply per-role ${field} through the detected dispatch surface`,
-      ),
-    );
-    return { requested, effective: "inherit", source: "fallback", status: "fallback" };
+    warnings.push(warning("unsupported-role-setting", configPath, `${host} cannot apply per-role ${field} through the detected dispatch surface`, {
+      source: selected.source,
+      input: requested,
+      causeSource: capabilitySources[supportedKey],
+    }));
+    return { requested, effective: "inherit", source: "fallback", inputSource: selected.source, status: "fallback" };
   }
 
   const available = capabilities[availableKey];
   if (Array.isArray(available) && !available.includes(requested)) {
-    warnings.push(
-      warning("unavailable-value", configPath, `${JSON.stringify(requested)} is not available on ${host}`),
-    );
-    return { requested, effective: "inherit", source: "fallback", status: "fallback" };
+    warnings.push(warning("unavailable-value", configPath, `${JSON.stringify(requested)} is not available on ${host}`, {
+      source: selected.source,
+      input: requested,
+      candidates: available,
+      causeSource: capabilitySources[availableKey],
+    }));
+    return { requested, effective: "inherit", source: "fallback", inputSource: selected.source, status: "fallback" };
   }
 
-  if (capabilities[supportedKey] !== true || !Array.isArray(available)) {
-    warnings.push(
-      warning(
-        "runtime-validation-required",
-        configPath,
-        `${JSON.stringify(requested)} must be confirmed against the active ${host} session before dispatch`,
-        requested,
-      ),
-    );
-    return { requested, effective: requested, source: selected.source, status: "pending-validation" };
+  if (capabilities[supportedKey] !== true || !Array.isArray(available) || !applicationPath) {
+    warnings.push(warning("runtime-validation-required", configPath, `${JSON.stringify(requested)} has no confirmed ${host} role-level application path and availability evidence`, {
+      source: selected.source,
+      input: requested,
+      candidates: available,
+      causeSource: capabilitySources[supportedKey],
+    }));
+    return { requested, effective: "inherit", source: "fallback", inputSource: selected.source, status: "pending-validation" };
   }
 
-  return { requested, effective: requested, source: selected.source, status: "applied" };
+  return {
+    requested,
+    effective: requested,
+    source: selected.source,
+    status: "applied",
+    applicationPath,
+  };
 }
 
-function lifecycleAction({ mode, event, role, capabilities, rotate, warnings, host }) {
+function lifecycleAction({ mode, event, role, capabilities, capabilitySources, rotate, warnings, host }) {
+  if (role === "planner" && event === "retry" && !rotate.includes(role)) {
+    return { action: "idle", reason: "implementation retry does not require Planner" };
+  }
+  if (capabilities.subagents === false) {
+    return { action: "isolated-work-unit", reason: "subagents unavailable" };
+  }
   if (rotate.includes(role)) return { action: "fresh", reason: "explicit rotation" };
-  if (event === "initial") return { action: capabilities.subagents === false ? "isolated-work-unit" : "fresh", reason: "no prior role session" };
-  if (role === "planner" && event === "retry") return { action: "idle", reason: "implementation retry does not require Planner" };
+  if (event === "initial") return { action: "fresh", reason: "no prior role session" };
 
   const wantsResume = event === "retry" || mode === "balanced" || role === "planner";
   if (!wantsResume) return { action: "fresh", reason: "fresh mode at Sprint boundary" };
-
-  if (capabilities.resume === true) return { action: "resume", reason: event === "retry" ? "same Sprint retry" : "balanced role reuse" };
+  if (capabilities.resume === true) {
+    return { action: "resume", reason: event === "retry" ? "same Sprint retry" : "balanced role reuse" };
+  }
 
   const configPath = `lifecycle.${host}.${role}`;
-  if (capabilities.resume === false) {
-    warnings.push(warning("resume-unsupported", configPath, `${host} cannot resume this role; starting a new isolated work unit`, "isolated-work-unit"));
-  } else {
-    warnings.push(warning("resume-unconfirmed", configPath, `${host} resume capability is unconfirmed; use a new isolated work unit unless the host confirms resume`, "isolated-work-unit"));
-  }
+  const code = capabilities.resume === false ? "resume-unsupported" : "resume-unconfirmed";
+  const reason = capabilities.resume === false
+    ? `${host} cannot resume this role; starting a new isolated work unit`
+    : `${host} resume capability is unconfirmed; use a new isolated work unit unless the host confirms resume`;
+  warnings.push(warning(code, configPath, reason, {
+    effective: "isolated-work-unit",
+    source: capabilitySources.resume,
+    input: capabilities.resume,
+    causeSource: "capability",
+  }));
   return { action: "isolated-work-unit", reason: "resume unavailable or unconfirmed" };
+}
+
+function validateRotate(rotate) {
+  if (!Array.isArray(rotate)) throw new Error("rotate must be an array of role names");
+  const normalized = rotate.map((role) => typeof role === "string" ? role.trim() : role).filter(Boolean);
+  const invalid = normalized.filter((role) => !ROLES.includes(role));
+  if (invalid.length) {
+    throw new Error(`invalid --rotate role(s): ${invalid.join(", ")}; expected ${ROLES.join(", ")}`);
+  }
+  return [...new Set(normalized)];
 }
 
 export function resolveRuntimeConfig({
   root = process.cwd(),
   event = "initial",
   host: selectedHost = "all",
-  capabilityOverrides = {},
+  capabilityOverrides,
+  capabilitySource = "capability",
+  capabilityDiagnostics = [],
   rotate = [],
 } = {}) {
-  const warnings = [];
+  const warnings = [...capabilityDiagnostics];
+  const normalizedRotate = validateRotate(rotate);
   const sharedPath = path.join(root, ".harness", "config.json");
   const personalPath = path.join(root, ".harness", "config.local.json");
-  const shared = readJson(sharedPath, ".harness/config.json", warnings);
-  const personal = readJson(personalPath, ".harness/config.local.json", warnings);
-  const capabilities = normalizeCapabilities(capabilityOverrides);
+  const shared = readJson(sharedPath, ".harness/config.json", "shared", warnings);
+  const personal = readJson(personalPath, ".harness/config.local.json", "personal", warnings);
+  const { capabilities, sources: capabilitySources } = normalizeCapabilities(
+    capabilityOverrides,
+    warnings,
+    capabilitySource,
+  );
 
   let lifecycle = own(personal, "lifecycle")
     ? { value: personal.lifecycle, source: "personal" }
     : own(shared, "lifecycle")
       ? { value: shared.lifecycle, source: "shared" }
       : { value: DEFAULT_CONFIG.lifecycle, source: "plugin" };
-  if (!['balanced', 'fresh'].includes(lifecycle.value)) {
-    warnings.push(warning("invalid-lifecycle", "lifecycle", "expected balanced or fresh", "balanced"));
+  lifecycle.value = normalizeRuntimeValue(lifecycle.value);
+  if (!["balanced", "fresh"].includes(lifecycle.value)) {
+    warnings.push(warning("invalid-lifecycle", "lifecycle", "expected balanced or fresh", {
+      effective: "balanced",
+      source: lifecycle.source,
+      input: lifecycle.value,
+    }));
     lifecycle = { value: "balanced", source: "fallback" };
   }
 
@@ -205,7 +374,13 @@ export function resolveRuntimeConfig({
     const hostWarningsStart = warnings.length;
     const roles = {};
     for (const role of ROLES) {
-      const settings = {};
+      const settings = {
+        identity: {
+          role,
+          sessionPolicyKey: `${host}:${role}`,
+          mustNotShareWith: ROLES.filter((otherRole) => otherRole !== role),
+        },
+      };
       for (const field of FIELDS) {
         settings[field] = resolveField({
           host,
@@ -213,6 +388,7 @@ export function resolveRuntimeConfig({
           field,
           selected: chooseValue(personal, shared, host, role, field),
           capabilities: capabilities[host],
+          capabilitySources: capabilitySources[host],
           warnings,
         });
       }
@@ -221,7 +397,8 @@ export function resolveRuntimeConfig({
         event,
         role,
         capabilities: capabilities[host],
-        rotate,
+        capabilitySources: capabilitySources[host],
+        rotate: normalizedRotate,
         warnings,
         host,
       });
@@ -229,6 +406,7 @@ export function resolveRuntimeConfig({
     }
     resolvedHosts[host] = {
       capabilities: capabilities[host],
+      capabilitySources: capabilitySources[host],
       roles,
       warningCount: warnings.length - hostWarningsStart,
     };
@@ -241,10 +419,14 @@ export function resolveRuntimeConfig({
       shared: { path: sharedPath, present: fs.existsSync(sharedPath), valid: Boolean(shared) },
       personal: { path: personalPath, present: fs.existsSync(personalPath), valid: Boolean(personal) },
     },
-    lifecycle: { mode: lifecycle.value, source: lifecycle.source, event },
+    lifecycle: { mode: lifecycle.value, source: lifecycle.source, event, rotate: normalizedRotate },
     hosts: resolvedHosts,
     invariants: {
       separateGeneratorEvaluator: true,
+      sessionPolicyKeys: {
+        generator: "host:generator",
+        evaluator: "host:evaluator",
+      },
       stateSource: "canonical files",
       retryScope: "same Sprint",
     },
@@ -252,20 +434,47 @@ export function resolveRuntimeConfig({
   };
 }
 
+function requireArg(argv, index, flag) {
+  const value = argv[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
 function parseArgs(argv) {
   const options = { root: process.cwd(), event: "initial", host: "all", rotate: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--root") options.root = path.resolve(argv[++index]);
-    else if (arg === "--event") options.event = argv[++index];
-    else if (arg === "--host") options.host = argv[++index];
-    else if (arg === "--capabilities") options.capabilitiesPath = path.resolve(argv[++index]);
-    else if (arg === "--rotate") options.rotate = argv[++index].split(",").filter(Boolean);
+    if (arg === "--root") options.root = path.resolve(requireArg(argv, index++, arg));
+    else if (arg === "--event") options.event = requireArg(argv, index++, arg);
+    else if (arg === "--host") options.host = requireArg(argv, index++, arg);
+    else if (arg === "--capabilities") options.capabilitiesPath = path.resolve(requireArg(argv, index++, arg));
+    else if (arg === "--rotate") options.rotate = requireArg(argv, index++, arg).split(",").map((item) => item.trim()).filter(Boolean);
     else if (arg === "--json") options.json = true;
     else if (arg === "--help") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
   return options;
+}
+
+function readCapabilityFile(file) {
+  if (!file) return { capabilityOverrides: undefined, capabilityDiagnostics: [], capabilitySource: "plugin" };
+  const source = `capability:${file}`;
+  try {
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("capability input must be a regular file, not a symlink or directory");
+    const value = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("capability top level must be an object");
+    return { capabilityOverrides: value, capabilityDiagnostics: [], capabilitySource: source };
+  } catch (error) {
+    return {
+      capabilityOverrides: undefined,
+      capabilitySource: source,
+      capabilityDiagnostics: [warning("invalid-capability-file", "capabilities", error.message, {
+        source,
+        causeSource: "capability",
+      })],
+    };
+  }
 }
 
 function printText(result) {
@@ -281,7 +490,7 @@ function printText(result) {
   if (result.warnings.length) {
     console.log("\nWarnings");
     for (const item of result.warnings) {
-      console.log(`  [${item.code}] ${item.path}: ${item.reason}; effective=${item.effective}`);
+      console.log(`  [${item.code}] ${item.path}: ${item.reason}; source=${item.source}; effective=${item.effective}`);
     }
   }
 }
@@ -291,7 +500,7 @@ function usage() {
     `  --root PATH             target repository (default: cwd)\n` +
     `  --host HOST             claudeCode, codex, or all\n` +
     `  --event EVENT           initial, sprint-change, or retry\n` +
-    `  --capabilities FILE     detected host capabilities JSON\n` +
+    `  --capabilities FILE     observed host capabilities JSON file\n` +
     `  --rotate ROLE[,ROLE]    force selected roles fresh\n` +
     `  --json                  machine-readable output\n`;
 }
@@ -304,10 +513,8 @@ if (isMain) {
       console.log(usage());
       process.exit(0);
     }
-    const capabilityOverrides = options.capabilitiesPath
-      ? JSON.parse(fs.readFileSync(options.capabilitiesPath, "utf8"))
-      : {};
-    const result = resolveRuntimeConfig({ ...options, capabilityOverrides });
+    const capabilityInput = readCapabilityFile(options.capabilitiesPath);
+    const result = resolveRuntimeConfig({ ...options, ...capabilityInput });
     if (options.json) console.log(JSON.stringify(result, null, 2));
     else printText(result);
   } catch (error) {

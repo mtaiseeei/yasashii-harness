@@ -201,9 +201,20 @@ new Sprint boundary but resumes same-Sprint retries. Generator and Evaluator nev
 resolved independently per host and role, with no cross-host name translation. Unsupported or unavailable leaves warn
 and fall back to inheritance.
 
-Claude Code may apply role settings through a detected agent/dispatch surface. The Codex plugin catalog distributes
+The shared JSON is self-describing through ignored `$comment`, `policy`, and `references` fields. Model input is only
+trimmed; the resolver never fuzzy-matches or translates an ambiguous name. Confirmed candidates may appear in a
+warning, but are never selected automatically.
+
+Claude Code exposes a subagent model control, while role effort requires a concrete agent-definition frontmatter or
+another explicitly observed role-level application path. The default Claude Code `roleEffort` capability is therefore
+unknown, not true. The Codex plugin catalog distributes
 skills, not agent definitions, so Codex needs an existing project custom agent or capable spawn surface. Harness never
 overwrites `.claude/agents/`, `.codex/agents/`, guidance, or existing config to manufacture support.
+
+The orchestrator owns capability collection at Harness start and whenever host state changes. It passes an observed
+JSON file with `--capabilities <file>`; unknown fields stay null or omitted. Available value lists and actual role-level
+`applicationPaths` are separate evidence. Missing, malformed, or mistyped capability files produce warnings and
+conservative inheritance rather than a false applied state.
 
 `scripts/resolve-runtime-config.mjs` defines the zero-dependency merge and fallback behavior;
 `scripts/check-runtime-config.mjs` protects defaults, partial override, host isolation, lifecycle, invalid settings,

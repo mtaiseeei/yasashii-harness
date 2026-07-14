@@ -86,6 +86,8 @@ fresh化し、同一Sprintの不合格修正はresumeします。GeneratorとEva
 Claude Code / Codexごとの `planner` / `generator` / `evaluator` に `model` と `effort` を設定できます。
 個人差分はgit管理外の `.harness/config.local.json` に必要な項目だけ書き、共有設定の他項目を保持します。
 無効・利用不能・host未対応の値は、その項目だけ警告付きで `inherit` へ戻ります。
+正確なmodel ID / aliasは共有configの `references` にあるprovider公式情報で確認してください。前後空白以外を
+自動補正せず、曖昧なmodel名を候補へ変換することはありません。
 
 ```bash
 node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" --host claudeCode --event initial
@@ -95,6 +97,11 @@ node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" 
 Codex plugin manifestはAgent定義を配布しないため、Codexのrole別指定は利用repoのcustom agentまたは
 現在のspawn面が対応するときだけ適用します。Harnessは既存の `AGENTS.md`、`CLAUDE.md`、Agent定義、
 設定を上書きしません。
+
+Claude Codeのrole別effortは通常のper-dispatch項目ではありません。project側Agent frontmatterなど、
+対象roleへeffortを渡す具体的な適用面をcapabilityファイルで確認できた時だけ有効になります。
+capabilityファイルはオーケストレーターがHarness開始時またはhost変更時に観測事実から作成し、
+`--capabilities <file>` で渡します。値一覧だけでは適用済みになりません。
 
 ## 仕組み
 

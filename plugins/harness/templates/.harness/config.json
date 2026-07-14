@@ -1,4 +1,23 @@
 {
+  "$comment": "Agentic Harness runtime policy. balanced reuses the same role when the host confirms resume; fresh rotates Generator and Evaluator at Sprint boundaries. Model and effort identifiers are never guessed or translated between providers. Unconfirmed or unavailable values fall back to parent-session inheritance with a warning.",
+  "references": {
+    "openaiApiModels": "https://developers.openai.com/api/docs/models",
+    "codexModels": "https://developers.openai.com/codex/models",
+    "codexConfig": "https://developers.openai.com/codex/config-reference",
+    "codexSubagents": "https://developers.openai.com/codex/subagents",
+    "anthropicModels": "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+    "claudeCodeModelConfig": "https://code.claude.com/docs/en/model-config",
+    "claudeCodeSubagents": "https://code.claude.com/docs/en/sub-agents"
+  },
+  "policy": {
+    "sharedConfig": ".harness/config.json",
+    "personalLeafOverrides": ".harness/config.local.json",
+    "precedence": "personal explicit leaf > shared explicit leaf > plugin default",
+    "defaultLifecycle": "balanced",
+    "defaultModelAndEffort": "inherit",
+    "modelIdentifiers": "Use an exact provider-supported ID or alias from the official references. Only surrounding whitespace is normalized; ambiguous names are never converted.",
+    "capabilities": "The orchestrator supplies a JSON file based on observed host controls. A value list alone does not prove that a role-level application path exists."
+  },
   "version": 1,
   "lifecycle": "balanced",
   "hosts": {

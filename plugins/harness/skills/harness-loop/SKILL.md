@@ -157,12 +157,36 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   `個人の明示項目 > 共有の明示項目 > plugin既定` で、設定オブジェクト全体を置換しない。
 - plugin既定は `lifecycle: balanced`、各host × roleの `model: inherit` / `effort: inherit`。
 - `--event` は初回 `initial`、新Sprintへの遷移 `sprint-change`、同一Sprintの不合格修正 `retry`。
-- ホスト能力が判明している場合は `--capabilities <json>` で渡す。利用可能model / effort一覧を渡せば
-  利用不能値をdispatch前に検出できる。能力不明の明示値は「適用済み」と断定せず、runtime確認が必要と通知する。
+- capabilityの準備・更新・受け渡しはオーケストレーターの責務。Harness開始時とhost状態変更時に、
+  実際のhost control、ユーザーが明示したAgent定義、保守された既定から観測できた項目だけをJSONファイルへ書く。
+  未確認項目は `null` または省略とし、model知識から `true` を推定しない。
+- capabilityはJSON literalではなく `--capabilities <file>` で渡す。ファイルにはhost別の値一覧に加え、
+  roleへ値を実際に渡す面を `applicationPaths.roleModel` / `applicationPaths.roleEffort` として記録する。
+  値一覧だけでは適用可能とみなさない。ファイルの欠落・不正・型不正はwarning付きの保守的既定へ戻す。
+
+```json
+{
+  "observedAt": "<ISO-8601 timestamp>",
+  "evidence": "<host control or user-owned agent definition inspected>",
+  "hosts": {
+    "claudeCode": {
+      "roleEffort": true,
+      "efforts": ["<confirmed value>"],
+      "applicationPaths": {
+        "roleEffort": "<project agent frontmatter path or other observed surface>"
+      }
+    }
+  }
+}
+```
+
+- model / effortは前後空白だけを除去し、共有config内の公式referenceで正確なID / aliasを確認する。
+  大文字小文字、世代名、provider名などから別modelへ推定変換しない。
 - 実効設定とwarningをdispatch前に確認し、明示値を適用できない場合はその項目だけ親セッション継承へ戻す。
   warningには問題項目、理由、実効値を含める。設定不備だけを理由にループ全体を停止しない。
-- Claude Codeでは、検出したdispatch面がrole別model / effortとresumeを受け付ける場合だけ適用する。
-  plugin同梱Agentのfrontmatterを自動書換えない。
+- Claude Codeのrole modelはhostのsubagent model controlを使えるが、role effortは通常のper-dispatch項目ではない。
+  project側Agent frontmatter等の具体的適用面がcapabilityで確認された場合だけrole effortを適用する。
+  plugin同梱Agentのfrontmatterを自動書換えず、既定 `roleEffort` は未確認とする。
 - Codexでは、利用repoのcustom agentまたは現在のspawn面がrole別指定を受け付ける場合だけ適用する。
   Codex plugin manifestはAgent定義を配布しないため、設定があるだけでcustom agentが作られたとは扱わない。
 - 既存の `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.codex/agents/`、既存設定は一切上書きしない。
