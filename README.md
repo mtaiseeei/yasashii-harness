@@ -1,7 +1,5 @@
 # agentic-harness
 
-**短い指示は入口。大きな開発を継続的に前へ進めることが本体。**
-
 Agentic Harness は、企画・実装・独立評価・状態遷移を **Planner / Generator / Evaluator の3 role**、
 ファイル正本、Sprint でつなぐ Claude Code / Codex 向け開発ハーネスです。
 単発の自動実装で終わらず、新規サービス、中小企業にとって大きな業務システム、
