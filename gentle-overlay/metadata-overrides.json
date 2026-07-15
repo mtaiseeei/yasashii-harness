@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "files": {
+    ".claude-plugin/marketplace.json": {
+      "$.name": "yasashii-harness",
+      "$.plugins[0].name": "harness",
+      "$.plugins[0].source": "./plugins/harness",
+      "$.plugins[0].repository": "https://github.com/mtaiseeei/yasashii-harness"
+    },
+    ".agents/plugins/marketplace.json": {
+      "$.name": "yasashii-harness",
+      "$.plugins[0].name": "harness",
+      "$.plugins[0].source.source": "local",
+      "$.plugins[0].source.path": "./plugins/harness"
+    },
+    "plugins/harness/.claude-plugin/plugin.json": {
+      "$.name": "harness",
+      "$.repository": "https://github.com/mtaiseeei/yasashii-harness",
+      "$.homepage": "https://github.com/mtaiseeei/yasashii-harness"
+    },
+    "plugins/harness/.codex-plugin/plugin.json": {
+      "$.name": "harness",
+      "$.repository": "https://github.com/mtaiseeei/yasashii-harness",
+      "$.homepage": "https://github.com/mtaiseeei/yasashii-harness"
+    }
+  }
+}

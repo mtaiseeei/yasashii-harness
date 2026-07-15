@@ -1,0 +1,15 @@
+docs/upstream-mapping.md
+gentle-overlay/README.md
+gentle-overlay/anchors.tsv
+gentle-overlay/downstream-files.txt
+gentle-overlay/fragments/README.md
+gentle-overlay/fragments/evaluator.md
+gentle-overlay/fragments/generator.md
+gentle-overlay/fragments/harness-loop.md
+gentle-overlay/fragments/planner.md
+gentle-overlay/metadata-overrides.json
+gentle-overlay/upstream-base.txt
+plugins/harness/scripts/run-runtime-config.sh
+scripts/regression-check.sh
+scripts/sync-harness.py
+scripts/sync-harness.sh
