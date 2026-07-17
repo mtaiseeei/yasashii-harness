@@ -1,4 +1,4 @@
-# agentic-harness
+# yasashii-harness
 
 **短い指示は入口。大きな開発を継続的に前へ進めることが本体。**
 
