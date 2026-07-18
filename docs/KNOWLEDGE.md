@@ -251,11 +251,14 @@ cross-host name translation. Unsupported leaves warn and fall back to inheritanc
 unavailable, routing tries the configured strong Sol/high pair; if Sol is also unavailable, both leaves inherit.
 Terra is not an automatic standard, strong, or availability-fallback candidate.
 
-Generator routing is file-backed through `Model Tier: standard | strong` and `Rotate: model-escalation` in
+Generator routing is file-backed through `Model Tier: standard | strong` and an explicit `Rotate` reason in
 `docs/sprints/state.md`. High-risk Sprints start strong. The second consecutive `implementation-issue`, or an
 evidence-verified Evaluator recommendation accepted by the orchestrator, changes the tier to strong. The orchestrator
 records that transition before fresh dispatch and never resumes the old Luna Generator. The third consecutive failure
 stops for user input. A `spec-issue` returns to Planner without consuming Generator escalation.
+Failure/risk/recommendation-driven tier changes use `Rotate: model-escalation`; availability fallback from an unavailable
+standard model uses `Rotate: model-availability`. When Generator is not the next role, its resolved model tier is null and
+must not be persisted over the last actually dispatched tier.
 The resolver receives the current state value through `currentModelTier` / `--current-model-tier`; it forces fresh work
 only when the desired tier differs. Re-resolving an already-strong retry, high-risk Sprint, recommendation, or
 availability fallback resumes the strong Generator only when routing-preserving resume is evidenced.

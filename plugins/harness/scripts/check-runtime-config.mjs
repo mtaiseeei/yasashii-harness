@@ -104,7 +104,7 @@ function codexCliCapabilities() {
   return {
     codex: {
       subagents: true,
-      resume: false,
+      resume: null,
       roleModel: true,
       roleEffort: true,
       models: ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"],
@@ -210,6 +210,17 @@ check("recorded Codex CLI and App capability snapshots resolve without claiming 
   assert.equal(cli.hosts.codex.roles.evaluator.effort.effective, "high");
   assert.equal(cli.verification.launchVerified, false);
 
+  const cliResume = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    event: "sprint-change",
+    currentModelTier: "standard",
+    capabilityOverrides: codexCliCapabilities(),
+  });
+  assert.equal(cliResume.hosts.codex.roles.generator.lifecycle.action, "isolated-work-unit");
+  assert.ok(cliResume.warnings.some((item) => item.code === "resume-unconfirmed"));
+  assert.equal(cliResume.warnings.some((item) => item.code === "resume-unsupported"), false);
+
   const app = resolveRuntimeConfig({ root, host: "codex", capabilityOverrides: codexAppCapabilities() });
   assert.equal(app.hosts.codex.roles.planner.model.effective, "gpt-5.6-sol");
   assert.equal(app.hosts.codex.roles.generator.model.effective, "gpt-5.6-sol");
@@ -300,6 +311,7 @@ check("Generator stays standard through retry one and escalates fresh on retry t
   assert.equal(escalated.routing.stopReason, null);
   assert.equal(generator.routing.modelTier, "strong");
   assert.match(generator.routing.reason, /retry-threshold/);
+  assert.equal(generator.routing.rotateReason, "model-escalation");
   assert.equal(generator.model.effective, "gpt-5.6-sol");
   assert.equal(generator.effort.effective, "high");
   assert.equal(generator.lifecycle.action, "fresh");
@@ -406,15 +418,19 @@ check("spec issues route to Planner and the third implementation failure stops f
 
   const specIssue = resolveRuntimeConfig({
     root,
-    host: "codex",
+    host: "all",
     event: "retry",
     retryCount: 2,
     failureKind: "spec-issue",
-    currentModelTier: "standard",
+    currentModelTier: "strong",
     capabilityOverrides: capabilities,
   });
   assert.equal(specIssue.routing.nextRole, "planner");
   assert.equal(specIssue.routing.stopReason, null);
+  assert.equal(specIssue.hosts.codex.roles.generator.routing.modelTier, null);
+  assert.equal(specIssue.hosts.codex.roles.generator.routing.reason, "generator-not-routed");
+  assert.equal(specIssue.hosts.codex.roles.generator.routing.rotateReason, null);
+  assert.equal(specIssue.hosts.claudeCode.roles.generator.routing.modelTier, null);
   assert.notEqual(specIssue.hosts.codex.roles.generator.lifecycle.action, "fresh");
 
   const stopped = resolveRuntimeConfig({
@@ -517,6 +533,7 @@ check("standard Luna unavailability falls back to Sol then inherit, never Terra"
   const fallbackGenerator = fallback.hosts.codex.roles.generator;
   assert.equal(fallbackGenerator.routing.modelTier, "strong");
   assert.match(fallbackGenerator.routing.reason, /standard-model-unavailable/);
+  assert.equal(fallbackGenerator.routing.rotateReason, "model-availability");
   assert.equal(fallbackGenerator.model.effective, "gpt-5.6-sol");
   assert.equal(fallbackGenerator.effort.effective, "high");
   assert.notEqual(fallbackGenerator.model.effective, "gpt-5.6-terra");
@@ -766,6 +783,7 @@ check("orchestration contract records model tier before fresh dispatch and keeps
   const evaluator = fs.readFileSync(path.join(pluginRoot, "agents/evaluator.md"), "utf8");
   assert.match(loop, /Model Tier.*standard.*strong/is);
   assert.match(loop, /Rotate:\s*model-escalation/i);
+  assert.match(loop, /Rotate:\s*model-availability/i);
   assert.match(loop, /--current-model-tier/);
   assert.match(loop, /desired tier.*現在tier.*異なる.*fresh/is);
   assert.match(loop, /合格後.*次Sprint.*最後に実dispatchした.*Model Tier.*保持/is);

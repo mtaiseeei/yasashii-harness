@@ -661,7 +661,7 @@ function requestedModelAvailable(selected, capabilities) {
 }
 
 function generatorTierDecision({ route, escalation, standardModel, capabilities }) {
-  if (route.nextRole !== "generator") return { modelTier: "standard", reason: "generator-not-routed" };
+  if (route.nextRole !== "generator") return { modelTier: null, reason: "generator-not-routed" };
   if (route.sprintRisk === "high") return { modelTier: "strong", reason: "high-risk-sprint" };
   if (escalation.onEvaluatorRecommendation.value
     && route.evaluatorRecommendation?.tier === "strong"
@@ -679,6 +679,13 @@ function generatorTierDecision({ route, escalation, standardModel, capabilities 
     modelTier: "standard",
     reason: route.retryCount > 0 ? "retry-below-threshold" : "standard",
   };
+}
+
+function generatorRotateReason({ route, tier }) {
+  if (route.nextRole !== "generator" || tier.modelTier === route.currentModelTier) return null;
+  if (route.currentModelTier === "unknown") return "runtime-migration";
+  if (tier.reason === "standard-model-unavailable") return "model-availability";
+  return "model-escalation";
 }
 
 function validateRotate(rotate) {
@@ -810,6 +817,7 @@ export function resolveRuntimeConfig({
         settings.routing = {
           modelTier: tier.modelTier,
           reason: tier.reason,
+          rotateReason: generatorRotateReason({ route, tier }),
           afterFailures: escalation.afterFailures.value,
           onEvaluatorRecommendation: escalation.onEvaluatorRecommendation.value,
         };
@@ -828,7 +836,11 @@ export function resolveRuntimeConfig({
             warnings,
           });
         }
-        if (role === "generator") settings.routing = { modelTier: "standard", reason: "host-default" };
+        if (role === "generator") {
+          settings.routing = route.nextRole === "generator"
+            ? { modelTier: "standard", reason: "host-default", rotateReason: null }
+            : { modelTier: null, reason: "generator-not-routed", rotateReason: null };
+        }
       }
       settings.lifecycle = lifecycleAction({
         mode: lifecycle.value,

@@ -1,6 +1,6 @@
 # Codex model routing と自動昇格の実装提案
 
-Status: Implemented in v0.4.0 / 2026-07-18にCodex CLIのfull routingとCodex Appのpartial routingを実起動確認
+Status: Implemented in v0.4.0, refined through v0.4.2 / 2026-07-18にCodex CLIのfull routingとCodex Appのpartial routingを実起動確認
 対象: `agentic-harness` plugin本体  
 対象外: Harnessを導入済みの各repoへの反映・移行
 
@@ -171,7 +171,8 @@ Model Tier: standard
 ```
 
 値は `standard` / `strong` とする。具体的なmodel名はruntime configが解決するため、Sprint stateを特定modelへ
-固定しない。model変更時は `Rotate: model-escalation` のような理由も残す。
+固定しない。model変更時は、失敗・リスク・Evaluator推薦による切替なら `Rotate: model-escalation`、
+通常modelの利用不能によるfallbackなら `Rotate: model-availability` のように理由も残す。
 
 ## 6. テスト計画
 

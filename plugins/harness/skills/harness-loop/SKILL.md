@@ -49,7 +49,7 @@ Planner ──→ Generator ──→ Evaluator
 - Current ID: sprint-NNN または sprint-NNN-patch-PPP
 - Retry Count: 0        # 現スプリントの連続不合格回数。合格・スプリント切替で0に戻す
 - Model Tier: standard  # standard / strong。具体的なmodel名はruntime configで解決する
-- Rotate: none          # tier変更時は model-escalation、旧state移行時は runtime-migration
+- Rotate: none          # 昇格時は model-escalation、利用不能fallback時は model-availability、旧state移行時は runtime-migration
 - Next Planned: sprint-NNN または TBD
 
 ## スプリント一覧
@@ -71,7 +71,8 @@ Status の語彙は次に限る:
 - `superseded` — 別スプリントに置き換えられて実施しない。置き換え先を書く
 
 `Model Tier` は `standard` / `strong` に限る。通常は `standard`。model tierを変更するときは、
-オーケストレーターが `Model Tier: strong` と `Rotate: model-escalation` をstate.mdへ先に記録し、
+オーケストレーターがresolverの`routing.rotateReason`を使い、失敗・リスク・Evaluator推薦による切替なら
+`Rotate: model-escalation`、通常modelの利用不能によるfallbackなら`Rotate: model-availability`をstate.mdへ先に記録し、
 古いGeneratorをresumeせずfreshなGeneratorをdispatchする。`Model Tier`は最後に実dispatchしたGeneratorのtierを表す。
 合格後に次Sprintのdispatchがある場合は先に`standard`へ戻さず、そのtierをStep 2のresolver呼出しまで保持する。
 全Sprint完了で次dispatchが無い場合だけ`standard` / `none`へ戻してよい。
@@ -258,7 +259,8 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   同一Sprintの評価文脈をresumeしてよい。未実証ならfreshな独立作業単位にする。
 - 例外として、Model Tierが`standard`から`strong`、または`strong`から`standard`へ変わるときは
   `balanced`でもGeneratorをfreshにする。同じtierでも`resume: true`の実証が無ければfreshにする。
-  `Rotate: model-escalation`をstate.mdへ記録してから、Sprint契約・progress・feedbackを読み直す新しいGeneratorをdispatchする。
+  resolverの`routing.rotateReason`（`model-escalation`または`model-availability`）をstate.mdへ記録してから、
+  Sprint契約・progress・feedbackを読み直す新しいGeneratorをdispatchする。
 - Plannerは初回ヒアリング中は継続してよい。重大な仕様再計画、resume失敗、明らかなcontext劣化、
   role逸脱や評価biasが疑われる場合は、理由を通知して対象roleだけfreshへローテーションする。
 - resume / Subagentが使えない場合は、正本ファイルを読み直す独立作業単位へfallbackする。
@@ -291,13 +293,16 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - デザインや体験の方向性に明確な意図がある。
 
 ### Step 2: 実装（Generator を dispatch）
-- resolverの`routing.nextRole`、Generatorの`routing.modelTier` / `reason`、lifecycle actionを確認する。
+- resolverの`routing.nextRole`、Generatorの`routing.modelTier` / `reason` / `rotateReason`、lifecycle actionを確認する。
+- `routing.nextRole`が`generator`でない場合、Generatorの`routing.modelTier`は`null`である。dispatch対象外の値を
+  state.mdへ永続化せず、`spec-issue`では現在のModel Tierを保持してPlannerへ戻す。
 - state.mdに保持した、最後に実dispatchした`Model Tier`を`currentModelTier`としてresolverへ渡す。
 - 旧stateに`Model Tier`が無ければ`currentModelTier=unknown`として解決し、desired tierと
   `Rotate: runtime-migration`をstate.mdへ記録してからfresh dispatchする。`unknown`自体はstateへ書かない。
   `Rotate`だけが無ければ`none`を補う。
 - resolverのdesired tierとcurrentModelTierを比較し、異なる場合はstate.mdの`Model Tier`をdesired tier、
-  `Rotate`を`model-escalation`へ更新してからfreshなGeneratorをdispatchする。同じ場合は`Rotate: none`として、
+  `Rotate`をresolverの`routing.rotateReason`へ更新してからfreshなGeneratorをdispatchする。通常modelの利用不能による
+  fallbackは`model-availability`、それ以外の通常のtier切替は`model-escalation`になる。同じ場合は`Rotate: none`として、
   `balanced`かつcapabilityの`resume: true`がmodel / effort保持を実証済みなら既存Generatorをresumeする。
   follow-up可能なだけ、または保持未確認ならfreshなGeneratorをdispatchする。
 - state.md の `Current ID` のStatus、Retry Count、Model Tier、Rotateをすべて確定してからdispatchする。

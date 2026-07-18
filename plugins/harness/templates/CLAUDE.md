@@ -36,6 +36,7 @@ Do not cross these ownership boundaries. If a role finds a problem outside its f
 Sprint statuses in `state.md` are: `planned`, `active`, `awaiting-eval`, `done`, `deferred`, `superseded`. Never skip or reorder sprints silently; record `deferred`/`superseded` with a reason.
 An older `docs/sprints/current.md` is a legacy pointer: convert it into `docs/sprints/state.md` once, then treat it as read-only reference. If an older `docs/progress.md` exists, treat it as a legacy reference log and do not append new sprint progress there.
 If an existing `state.md` has no `Model Tier`, pass `unknown` to the resolver once, persist only the returned `standard` or `strong` tier with `Rotate: runtime-migration`, and fresh-dispatch Generator. Never persist `unknown`. If only `Rotate` is absent, add `Rotate: none`.
+For a real Generator tier change, use the resolver's rotate reason: `model-escalation` for failure/risk/recommendation routing and `model-availability` for an unavailable standard-model fallback. When Generator is not the next role, its routing tier is null and must not replace the last dispatched tier in state.
 Use zero-padded sprint IDs. Do not create decimal sprint IDs such as `sprint-5.1` or `sprint-5.10`.
 For work between main sprints, use `sprint-NNN-patch-PPP`.
 
