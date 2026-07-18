@@ -185,11 +185,12 @@ def expected_files(base: str) -> dict[str, bytes]:
     return expected
 
 
-def validate_tree(base: str) -> None:
+def validate_tree(base: str, *, allow_missing_upstream: bool = False) -> None:
     baseline = set(tree_files(base))
     additions = set(downstream_files())
     actual = set(working_files())
-    missing = sorted((baseline | additions) - actual)
+    required = additions if allow_missing_upstream else baseline | additions
+    missing = sorted(required - actual)
     unclassified = sorted(actual - baseline - additions)
     if missing:
         raise SyncError("missing classified files: " + ", ".join(missing))
@@ -211,10 +212,11 @@ def validate_content(base: str) -> None:
 
 
 def apply(base: str) -> None:
-    validate_tree(base)
+    validate_tree(base, allow_missing_upstream=True)
     modes = tree_modes(base)
     for path, content in expected_files(base).items():
         destination = ROOT / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
             handle.write(content)
             temporary = Path(handle.name)
