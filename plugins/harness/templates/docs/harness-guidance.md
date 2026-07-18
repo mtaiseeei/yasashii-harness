@@ -38,7 +38,9 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
   dispatch-ready, not launch-verified, until host metadata proves the actual model and effort.
 - For Codex, use the strong Generator tier for a high-risk Sprint, the second consecutive implementation failure, or an
   evidence-verified Evaluator recommendation. Compare it with the last dispatched tier retained in state; record the new
-  `Model Tier` and `Rotate: model-escalation` before fresh dispatch only when the desired tier differs.
+  `Model Tier` and `Rotate: model-escalation` before fresh dispatch when the desired tier differs.
+- Even at the same tier, resume only when `resume: true` is backed by host metadata proving that routed model/effort is
+  preserved. Follow-up support alone is insufficient, and unverified paths use a fresh role work unit.
 - If an older state has no `Model Tier`, pass resolver-only `unknown`, persist the returned tier with
   `Rotate: runtime-migration`, and fresh-dispatch once; never persist `unknown`. If only `Rotate` is missing, add `none`.
 - Do not overwrite existing guidance, Agent definitions, or Harness settings to apply runtime configuration.

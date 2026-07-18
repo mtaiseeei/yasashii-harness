@@ -1,6 +1,6 @@
 {
   "name": "harness",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A file-backed, multi-sprint harness for long-running development, with separate Planner, Generator, and Evaluator roles.",
   "author": {
     "name": "taisei",
@@ -29,7 +29,7 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use Agentic Harness to turn this short new-service idea into a file-backed, multi-sprint development plan and start the first sprint.",
+      "Use Agentic Harness for this short new-service idea: make a file-backed multi-sprint plan and start the first sprint.",
       "Continue this existing repository from docs/sprints/state.md with separate Planner, Generator, and Evaluator roles."
     ]
   }

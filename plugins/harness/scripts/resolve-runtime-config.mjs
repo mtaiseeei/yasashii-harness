@@ -53,7 +53,9 @@ export const DEFAULT_CONFIG = Object.freeze({
 const DEFAULT_CAPABILITIES = Object.freeze({
   claudeCode: {
     subagents: true,
-    resume: true,
+    // Follow-up support alone does not prove that a resumed role keeps its
+    // routed model/effort. Require an observed capability snapshot.
+    resume: null,
     roleModel: true,
     // Claude Code effort is applied through agent-definition frontmatter, not
     // a generic per-dispatch control. Keep it unconfirmed until the active
@@ -587,6 +589,8 @@ function lifecycleAction({
 
   const wantsResume = event === "retry" || mode === "balanced" || role === "planner";
   if (!wantsResume) return { action: "fresh", reason: "fresh mode at Sprint boundary" };
+  // `resume` means more than accepting a follow-up: the observed host path must
+  // preserve the routed model and effort for the resumed turn.
   if (capabilities.resume === true) {
     return { action: "resume", reason: event === "retry" ? "same Sprint retry" : "balanced role reuse" };
   }
@@ -594,8 +598,8 @@ function lifecycleAction({
   const configPath = `lifecycle.${host}.${role}`;
   const code = capabilities.resume === false ? "resume-unsupported" : "resume-unconfirmed";
   const reason = capabilities.resume === false
-    ? `${host} cannot resume this role; starting a new isolated work unit`
-    : `${host} resume capability is unconfirmed; use a new isolated work unit unless the host confirms resume`;
+    ? `${host} cannot preserve routed model/effort on resume; starting a new isolated work unit`
+    : `${host} routing-preserving resume is unconfirmed; use a new isolated work unit unless host metadata confirms it`;
   warnings.push(warning(code, configPath, reason, {
     effective: "isolated-work-unit",
     source: capabilitySources.resume,

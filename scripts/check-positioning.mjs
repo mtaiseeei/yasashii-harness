@@ -11,6 +11,7 @@ const TARGET_PATHS = [
   "AGENTS.md",
   "CLAUDE.md",
   "docs/KNOWLEDGE.md",
+  "docs/proposals/codex-model-routing.md",
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   "plugins/harness/.claude-plugin/plugin.json",
@@ -20,6 +21,7 @@ const TARGET_PATHS = [
   "plugins/harness/agents/evaluator.md",
   "plugins/harness/commands/harness.md",
   "plugins/harness/hooks/session-start.sh",
+  "plugins/harness/templates/docs/harness-guidance.md",
 ];
 
 function parseArgs(argv) {
@@ -87,6 +89,8 @@ function validatePositioning(repoRoot) {
   const command = read("plugins/harness/commands/harness.md");
   const hook = read("plugins/harness/hooks/session-start.sh");
   const knowledge = read("docs/KNOWLEDGE.md");
+  const proposal = read("docs/proposals/codex-model-routing.md");
+  const harnessGuidance = read("plugins/harness/templates/docs/harness-guidance.md");
   const claudeManifest = json("plugins/harness/.claude-plugin/plugin.json");
   const codexManifest = json("plugins/harness/.codex-plugin/plugin.json");
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
@@ -122,6 +126,11 @@ function validatePositioning(repoRoot) {
       "3回目の連続失敗",
       "spec-issue",
       "Terra",
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      "Unknown model",
+      "フル経路",
     ]);
   });
 
@@ -180,6 +189,18 @@ function validatePositioning(repoRoot) {
       "dispatch-ready",
       "launch-verified",
       "Terra",
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      "full role-model routing",
+    ]);
+    includesAll("plugins/harness/skills/harness-loop/SKILL.md", loop, [
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      'fork_turns: "none"',
+      "gpt-5.6-luna",
+      "Unknown model",
     ]);
     includesAll("plugins/harness/agents/evaluator.md", evaluator, [
       "評価＋自己レビュー",
@@ -187,6 +208,21 @@ function validatePositioning(repoRoot) {
       "Escalation Evidence",
       "オーケストレーター",
       "実装やコード修正は行わない",
+    ]);
+  });
+
+  check("resume guidance requires routing-preservation evidence", () => {
+    includesAll("docs/proposals/codex-model-routing.md", proposal, [
+      "resume: true",
+      "model / effort保持",
+      "host metadata",
+      "freshなLuna Generator",
+    ]);
+    includesAll("plugins/harness/templates/docs/harness-guidance.md", harnessGuidance, [
+      "resume: true",
+      "routed model/effort",
+      "Follow-up support alone is insufficient",
+      "fresh role work unit",
     ]);
   });
 

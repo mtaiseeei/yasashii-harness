@@ -100,6 +100,40 @@ function completeCapabilities() {
   };
 }
 
+function codexCliCapabilities() {
+  return {
+    codex: {
+      subagents: true,
+      resume: false,
+      roleModel: true,
+      roleEffort: true,
+      models: ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"],
+      efforts: ["high", "xhigh"],
+      applicationPaths: {
+        roleModel: "Codex CLI native spawn_agent model argument",
+        roleEffort: "Codex CLI native spawn_agent reasoning_effort argument",
+      },
+    },
+  };
+}
+
+function codexAppCapabilities() {
+  return {
+    codex: {
+      subagents: true,
+      resume: false,
+      roleModel: true,
+      roleEffort: true,
+      models: ["gpt-5.6-sol", "gpt-5.6-terra"],
+      efforts: ["high", "xhigh"],
+      applicationPaths: {
+        roleModel: "Codex App native spawn_agent model argument",
+        roleEffort: "Codex App native spawn_agent reasoning_effort argument",
+      },
+    },
+  };
+}
+
 const checks = [];
 function check(name, run) {
   checks.push({ name, run });
@@ -117,6 +151,16 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.match(source, /(?:Orchestrator|オーケストレーター).*(?:cannot|does not|not|変更できない).*model/i);
   assert.match(source, /Luna.*Sol.*inherit/is);
   assert.match(source, /Terra.*(?:never|not|do not|自動選択しない)/i);
+  assert.match(source, /# EN:.*lifecycle/is);
+  assert.match(source, /# JA:.*lifecycle/is);
+  assert.match(source, /# EN:.*Codex CLI.*full role.*routing/is);
+  assert.match(source, /# JA:.*2026-07-18.*Codex CLI.*role別/is);
+  assert.match(source, /# EN:.*Planner/is);
+  assert.match(source, /# JA:.*Planner/is);
+  assert.match(source, /# EN:.*Generator/is);
+  assert.match(source, /# JA:.*Generator/is);
+  assert.match(source, /# EN:.*Evaluator/is);
+  assert.match(source, /# JA:.*Evaluator/is);
   assert.equal(config.lifecycle, "balanced");
   assert.deepEqual(config.hosts.codex.roles.planner, {
     model: "gpt-5.6-sol",
@@ -146,6 +190,48 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.equal(resolved.hosts.codex.roles.planner.model.requested, "gpt-5.6-sol");
   assert.equal(resolved.hosts.codex.roles.generator.model.requested, "gpt-5.6-luna");
   assert.equal(resolved.hosts.codex.roles.evaluator.model.requested, "gpt-5.6-sol");
+});
+
+check("recorded Codex CLI and App capability snapshots resolve without claiming launch verification", () => {
+  const root = fixture();
+  fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
+  fs.copyFileSync(
+    path.join(pluginRoot, "templates/.harness/config.toml"),
+    path.join(root, ".harness/config.toml"),
+  );
+
+  const cli = resolveRuntimeConfig({ root, host: "codex", capabilityOverrides: codexCliCapabilities() });
+  assert.equal(cli.hosts.codex.roles.planner.model.effective, "gpt-5.6-sol");
+  assert.equal(cli.hosts.codex.roles.planner.effort.effective, "high");
+  assert.equal(cli.hosts.codex.roles.generator.model.effective, "gpt-5.6-luna");
+  assert.equal(cli.hosts.codex.roles.generator.effort.effective, "xhigh");
+  assert.equal(cli.hosts.codex.roles.generator.routing.modelTier, "standard");
+  assert.equal(cli.hosts.codex.roles.evaluator.model.effective, "gpt-5.6-sol");
+  assert.equal(cli.hosts.codex.roles.evaluator.effort.effective, "high");
+  assert.equal(cli.verification.launchVerified, false);
+
+  const app = resolveRuntimeConfig({ root, host: "codex", capabilityOverrides: codexAppCapabilities() });
+  assert.equal(app.hosts.codex.roles.planner.model.effective, "gpt-5.6-sol");
+  assert.equal(app.hosts.codex.roles.generator.model.effective, "gpt-5.6-sol");
+  assert.equal(app.hosts.codex.roles.generator.effort.effective, "high");
+  assert.equal(app.hosts.codex.roles.generator.routing.modelTier, "strong");
+  assert.equal(app.hosts.codex.roles.generator.routing.reason, "standard-model-unavailable");
+  assert.equal(app.hosts.codex.roles.evaluator.model.effective, "gpt-5.6-sol");
+  assert.notEqual(app.hosts.codex.roles.generator.model.effective, "gpt-5.6-terra");
+  assert.equal(app.verification.launchVerified, false);
+
+  const futureAppCapabilities = codexAppCapabilities();
+  futureAppCapabilities.codex.models.unshift("gpt-5.6-luna");
+  const futureApp = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    capabilityOverrides: futureAppCapabilities,
+  });
+  assert.equal(futureApp.hosts.codex.roles.generator.model.effective, "gpt-5.6-luna");
+  assert.equal(futureApp.hosts.codex.roles.generator.effort.effective, "xhigh");
+  assert.equal(futureApp.hosts.codex.roles.generator.routing.modelTier, "standard");
+  assert.notEqual(futureApp.hosts.codex.roles.generator.model.effective, "gpt-5.6-terra");
+  assert.equal(futureApp.verification.launchVerified, false);
 });
 
 check("Codex defaults resolve by role while Claude Code stays inherited", () => {
@@ -846,6 +932,16 @@ check("Codex conservative defaults use isolated work units and source-aware resu
   const warning = result.warnings.find((item) => item.code === "resume-unconfirmed");
   assert.equal(warning.source, "plugin");
   assert.equal(warning.effective, "isolated-work-unit");
+});
+
+check("Claude Code resume stays unconfirmed until routing preservation is observed", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(), host: "claudeCode", event: "sprint-change", currentModelTier: "standard",
+  });
+  assert.equal(result.hosts.claudeCode.roles.generator.lifecycle.action, "isolated-work-unit");
+  assert.equal(result.hosts.claudeCode.roles.evaluator.lifecycle.action, "isolated-work-unit");
+  const warnings = result.warnings.filter((item) => item.code === "resume-unconfirmed");
+  assert.ok(warnings.length >= 2);
 });
 
 check("unsupported role settings warn and inherit", () => {

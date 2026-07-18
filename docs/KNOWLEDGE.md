@@ -242,8 +242,10 @@ explicit value, then plugin default. Lifecycle defaults to `balanced`. Claude Co
 `inherit`; Codex defaults Planner and Evaluator to `gpt-5.6-sol` / `high`, standard Generator to
 `gpt-5.6-luna` / `xhigh`, and strong Generator to `gpt-5.6-sol` / `high`.
 
-`balanced` reuses the same role between Sprints when resume is available; `fresh` rotates Generator and Evaluator at a
-new Sprint boundary. Same-Sprint retries normally resume, except a Generator model-tier change always forces fresh work.
+`balanced` reuses the same role between Sprints only when `resume: true` is backed by host metadata showing that the
+routed model and effort are preserved; merely accepting a follow-up is insufficient. `fresh` rotates Generator and
+Evaluator at a new Sprint boundary. Same-Sprint retries resume only with that same preservation evidence, and a
+Generator model-tier change always forces fresh work.
 Generator and Evaluator never share a session. Model and effort are resolved independently per host and role, with no
 cross-host name translation. Unsupported leaves warn and fall back to inheritance. If standard Luna is confirmed
 unavailable, routing tries the configured strong Sol/high pair; if Sol is also unavailable, both leaves inherit.
@@ -256,7 +258,7 @@ records that transition before fresh dispatch and never resumes the old Luna Gen
 stops for user input. A `spec-issue` returns to Planner without consuming Generator escalation.
 The resolver receives the current state value through `currentModelTier` / `--current-model-tier`; it forces fresh work
 only when the desired tier differs. Re-resolving an already-strong retry, high-risk Sprint, recommendation, or
-availability fallback resumes the strong Generator when the host supports resume.
+availability fallback resumes the strong Generator only when routing-preserving resume is evidenced.
 For a pre-routing state file with no `Model Tier`, the orchestrator passes `unknown` rather than assuming standard.
 The resolver treats unknown-to-desired as a tier change, so the orchestrator records the desired `standard` or `strong`
 value with `Rotate: runtime-migration` and performs one fresh dispatch. `unknown` is resolver input only and is never
@@ -340,6 +342,24 @@ The plugin does not hardcode or infer Claude-specific model names such as `opus`
 model and effort unless the user supplies a host-valid explicit override. Codex uses the Sol/Luna role defaults described
 above, but only through a confirmed Codex custom-agent or spawn surface. Codex names are never translated into Claude
 names. A config or resolver value alone is not proof that a Subagent launched with it.
+
+#### Verified Codex surface matrix (2026-07-18)
+
+The full role-model routing path is currently verified on Codex CLI: a Sol/high CLI parent used native `spawn_agent`
+with `fork_turns: "none"` to launch a fresh Luna/xhigh child, and the child rollout metadata recorded
+`gpt-5.6-luna` / `xhigh`. This was a native CLI subagent launch, not a shell-level direct `codex exec -m luna` substitute.
+
+Codex App is partially capable on the same date. Fresh Sol/high and Terra/xhigh overrides matched child metadata, while
+an explicit Luna request failed with `Unknown model`. A follow-up turn on completed Sol/high and Terra/xhigh children
+recorded Sol/low, so App resume is not treated as preserving routed model/effort. This is observed runtime evidence,
+not a permanent product rule.
+
+Shared `.harness/config.toml` therefore expresses desired role values only; it does not duplicate App and CLI settings.
+The orchestrator supplies a current capability snapshot with available models, efforts, and role-level application paths.
+If a future App snapshot includes Luna and native spawn arguments, the existing standard Generator setting resolves to
+Luna/xhigh without a config migration. Until resume preservation is evidenced for the active surface, routed Codex role
+work uses a fresh non-full-history spawn. Terra remains available for an explicit user override but is never an automatic
+standard, strong, or availability-fallback choice.
 
 ### Browser Verification Priority
 

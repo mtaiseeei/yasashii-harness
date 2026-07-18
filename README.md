@@ -119,6 +119,29 @@ Codexのrole既定は次のとおりです。
 | Generator（strong） | `gpt-5.6-sol` | `high` |
 | Evaluator | `gpt-5.6-sol` | `high` |
 
+### Codex実行面の確認状況（2026-07-18）
+
+ここでいう「フル経路」は、Planner / Generator / Evaluatorそれぞれについて、希望model / effortをnativeな
+fresh Subagentの起動引数へ渡し、host側metadataで実値を確認できる経路を指します。Codex全機能の優劣を
+表す言葉ではありません。
+
+| 実行面 | このrouting機能の状況 | host側で確認できたこと |
+|---|---|---|
+| Codex CLI | フル経路を確認済み | Sol/highのCLI親Agentからnative `spawn_agent`でfreshなLuna/xhighを起動し、子session metadataでも一致 |
+| Codex App | 部分対応 | freshなSol/highとTerra/xhighは一致。Luna指定は`Unknown model`で拒否 |
+| Claude Code | host設定を継承 | 既定は全role `inherit`。ユーザーがhostで有効な正式値を明示した場合だけ適用 |
+
+AppとCLIの差は `.harness/config.toml` の項目を増やして固定せず、Harness開始時に観測したcapabilityの
+利用可能model一覧と適用経路で解決します。将来Codex Appの一覧へLunaが追加された場合、同じGenerator設定が
+native Luna/xhighへ解決されます。現在のAppではLunaが利用不能なので、通常Generatorは既定規則どおり
+Sol/highへfallbackします。Terraはユーザーが明示指定した場合には利用できますが、Harnessの通常経路・昇格・
+利用不能fallbackでは自動選択しません。
+
+Codex Appで完了済みAgentへfollow-upした検証では、指定値がSol/lowへ変わったため、model / effortを保つresumeは
+未対応として扱います。CLIを含め、resume後も同じroutingがhost metadataで確認できるまでは、指定値が必要な
+roleは`fork_turns: "none"`のfresh起動を使います。これらは2026-07-18時点の観測結果であり、host更新後は
+capabilityと実起動証拠を取り直します。
+
 strongへ昇格するのは、高リスクSprint、2回目の連続`implementation-issue`、またはEvaluatorの証拠付き推薦を
 オーケストレーターが確認・採用した場合です。model tierが変わるときは`balanced`でも古いLuna Generatorを
 resumeせず、`Model Tier: strong`と`Rotate: model-escalation`をstateへ記録してからfreshなSol Generatorを
@@ -163,8 +186,9 @@ node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" 
   --retry-count 2 --failure-kind implementation-issue --current-model-tier standard
 ```
 
-`--current-model-tier`にはstate.mdの現在値を渡します。resolverが返すdesired tierと異なるときだけfresh化し、
-`strong`を継続する再評価では同じSol Generatorをresumeできます。
+`--current-model-tier`にはstate.mdの現在値を渡します。resolverが返すdesired tierと異なるときはfresh化します。
+同じtierを継続する場合も、現在の実行面がmodel / effortを保つresumeをhost metadataで確認できた時だけ同じ
+Generatorをresumeします。未確認または不一致の場合は正本ファイルを読み直すfresh Agentを使います。
 旧版のstate.mdに`Model Tier`が無い場合は、`standard`と推定せず`unknown`を渡します。resolverのdesired tierを
 `Model Tier`、`runtime-migration`を`Rotate`へ一度だけ記録してからfresh dispatchします。`unknown`は
 resolver入力専用で、state.mdには保存しません。`Model Tier`があり`Rotate`だけ無い場合は`none`を補います。
