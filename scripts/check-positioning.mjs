@@ -98,7 +98,7 @@ function validatePositioning(repoRoot) {
 
   check("README positioning and local override guidance", () => {
     includesAll("README.md", readme, [
-      "短い指示は入口。大きな開発を継続的に前へ進めることが本体。",
+      "入力の短さは始めやすさであり、開発規模の上限ではありません。",
       "Planner / Generator / Evaluator の3 role",
       "### 短い新規開発の例",
       "### 既存repoを継続する例",
