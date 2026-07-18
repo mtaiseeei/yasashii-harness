@@ -33,7 +33,18 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - Do not mark work complete until Evaluator verifies the running product with evidence.
 - Browser verification priority: app-native browser preview first, CLI Playwright second, manual fallback last.
 - Read shared runtime settings from `.harness/config.toml` and optional personal leaf overrides from the git-ignored
-  `.harness/config.local.toml`. Default to `balanced` and parent-session model/effort inheritance.
+  `.harness/config.local.toml`. Default to `balanced`; Claude Code inherits model/effort, while Codex uses the role defaults
+  written in the shared config only when a confirmed dispatch surface can accept them. Treat resolver output as
+  dispatch-ready, not launch-verified, until host metadata proves the actual model and effort.
+- For Codex, use the strong Generator tier for a high-risk Sprint, the second consecutive implementation failure, or an
+  evidence-verified Evaluator recommendation. Compare it with the last dispatched tier retained in state; record the new
+  `Model Tier` and `Rotate: model-escalation` before fresh dispatch when the desired tier differs.
+- If the standard Generator model is unavailable and routing falls back to the strong tier, record
+  `Rotate: model-availability` instead. If Generator is not the next role, do not persist its null routing tier.
+- Even at the same tier, resume only when `resume: true` is backed by host metadata proving that routed model/effort is
+  preserved. Follow-up support alone is insufficient, and unverified paths use a fresh role work unit.
+- If an older state has no `Model Tier`, pass resolver-only `unknown`, persist the returned tier with
+  `Rotate: runtime-migration`, and fresh-dispatch once; never persist `unknown`. If only `Rotate` is missing, add `none`.
 - Do not overwrite existing guidance, Agent definitions, or Harness settings to apply runtime configuration.
 ```
 

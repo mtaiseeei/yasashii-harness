@@ -4,6 +4,8 @@ This document preserves the background, references, and design decisions behind 
 
 For usage, see `README.md`. For the runtime loop, see `plugins/harness/skills/harness-loop/SKILL.md`.
 
+Implemented design record: [`Codex model routing と自動昇格`](proposals/codex-model-routing.md).
+
 ## Summary
 
 **A short instruction is the entry point. Keeping substantial development moving over time is the core product.**
@@ -236,12 +238,40 @@ definitions, so Codex uses an existing capable spawn surface when present and in
 
 Shared runtime intent lives in `.harness/config.toml`; `.harness/config.local.toml` supplies personal leaf-only
 overrides and is ignored by the nested `.harness/.gitignore`. Resolution order is personal explicit value, shared
-explicit value, then plugin default (`balanced`, with model/effort inherited from the parent session).
+explicit value, then plugin default. Lifecycle defaults to `balanced`. Claude Code role model/effort defaults remain
+`inherit`; Codex defaults Planner and Evaluator to `gpt-5.6-sol` / `high`, standard Generator to
+`gpt-5.6-luna` / `xhigh`, and strong Generator to `gpt-5.6-sol` / `high`.
 
-`balanced` reuses the same role between Sprints when resume is available; `fresh` rotates Generator and Evaluator at a
-new Sprint boundary but resumes same-Sprint retries. Generator and Evaluator never share a session. Model and effort are
-resolved independently per host and role, with no cross-host name translation. Unsupported or unavailable leaves warn
-and fall back to inheritance.
+`balanced` reuses the same role between Sprints only when `resume: true` is backed by host metadata showing that the
+routed model and effort are preserved; merely accepting a follow-up is insufficient. `fresh` rotates Generator and
+Evaluator at a new Sprint boundary. Same-Sprint retries resume only with that same preservation evidence, and a
+Generator model-tier change always forces fresh work.
+Generator and Evaluator never share a session. Model and effort are resolved independently per host and role, with no
+cross-host name translation. Unsupported leaves warn and fall back to inheritance. If standard Luna is confirmed
+unavailable, routing tries the configured strong Sol/high pair; if Sol is also unavailable, both leaves inherit.
+Terra is not an automatic standard, strong, or availability-fallback candidate.
+
+Generator routing is file-backed through `Model Tier: standard | strong` and an explicit `Rotate` reason in
+`docs/sprints/state.md`. High-risk Sprints start strong. The second consecutive `implementation-issue`, or an
+evidence-verified Evaluator recommendation accepted by the orchestrator, changes the tier to strong. The orchestrator
+records that transition before fresh dispatch and never resumes the old Luna Generator. The third consecutive failure
+stops for user input. A `spec-issue` returns to Planner without consuming Generator escalation.
+Failure/risk/recommendation-driven tier changes use `Rotate: model-escalation`; availability fallback from an unavailable
+standard model uses `Rotate: model-availability`. When Generator is not the next role, its resolved model tier is null and
+must not be persisted over the last actually dispatched tier.
+The resolver receives the current state value through `currentModelTier` / `--current-model-tier`; it forces fresh work
+only when the desired tier differs. Re-resolving an already-strong retry, high-risk Sprint, recommendation, or
+availability fallback resumes the strong Generator only when routing-preserving resume is evidenced.
+For a pre-routing state file with no `Model Tier`, the orchestrator passes `unknown` rather than assuming standard.
+The resolver treats unknown-to-desired as a tier change, so the orchestrator records the desired `standard` or `strong`
+value with `Rotate: runtime-migration` and performs one fresh dispatch. `unknown` is resolver input only and is never
+persisted. If `Model Tier` exists and only `Rotate` is missing, the orchestrator adds `Rotate: none`. This lazy,
+no-overwrite migration runs when Harness next continues the repository; installing or updating the plugin does not edit
+existing Harness-managed repositories.
+After a passing Sprint, state retains the tier of the last actually dispatched Generator while advancing Current ID and
+resetting Retry Count. Step 2 passes that retained tier to the resolver, compares it with the next Sprint's desired tier,
+then records Model Tier and Rotate before dispatch. Only terminal completion with no next dispatch resets the state to
+`standard` / `none`; this preserves detection of a strong-to-standard change.
 
 The shared TOML is self-describing through ordinary comments, including lifecycle semantics, parent-main-session
 inheritance, fallback policy, and purpose-labelled official URLs. Comments never enter the resolved data. Model input
@@ -262,6 +292,11 @@ The orchestrator owns capability collection at Harness start and whenever host s
 JSON file with `--capabilities <file>`; unknown fields stay null or omitted. Available value lists and actual role-level
 `applicationPaths` are separate evidence. Missing, malformed, or mistyped capability files produce warnings and
 conservative inheritance rather than a false applied state.
+
+The resolver calls a value `dispatch-ready` only when availability and a concrete role-level application path are both
+present. That result is not launch evidence. `launch-verified` requires model/effort metadata from the host session,
+trace, or dispatch record; without it, actual Subagent launch remains unverified. The orchestrator is the current main
+chat, not a spawned role, so runtime config never claims to change its model.
 
 `scripts/resolve-runtime-config.mjs` loads the bundled `smol-toml@1.7.0` parser and defines merge/fallback behavior;
 `scripts/check-runtime-config.mjs` protects defaults, partial override, host isolation, lifecycle, invalid settings,
@@ -306,7 +341,28 @@ describe Planner, Generator, and Evaluator as roles and place any multiple-Agent
 
 ### Model Policy
 
-The plugin should not hardcode Claude-specific model names such as `opus` in reusable workflow files. Claude Code and Codex expose different model surfaces, and users may have their own default/cost settings. The default policy is to inherit the host/user model. If a host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator are the best candidates for the strongest available reasoning model; Generator can usually inherit the default.
+The plugin does not hardcode or infer Claude-specific model names such as `opus`; Claude Code inherits the host/user
+model and effort unless the user supplies a host-valid explicit override. Codex uses the Sol/Luna role defaults described
+above, but only through a confirmed Codex custom-agent or spawn surface. Codex names are never translated into Claude
+names. A config or resolver value alone is not proof that a Subagent launched with it.
+
+#### Verified Codex surface matrix (2026-07-18)
+
+The full role-model routing path is currently verified on Codex CLI: a Sol/high CLI parent used native `spawn_agent`
+with `fork_turns: "none"` to launch a fresh Luna/xhigh child, and the child rollout metadata recorded
+`gpt-5.6-luna` / `xhigh`. This was a native CLI subagent launch, not a shell-level direct `codex exec -m luna` substitute.
+
+Codex App is partially capable on the same date. Fresh Sol/high and Terra/xhigh overrides matched child metadata, while
+an explicit Luna request failed with `Unknown model`. A follow-up turn on completed Sol/high and Terra/xhigh children
+recorded Sol/low, so App resume is not treated as preserving routed model/effort. This is observed runtime evidence,
+not a permanent product rule.
+
+Shared `.harness/config.toml` therefore expresses desired role values only; it does not duplicate App and CLI settings.
+The orchestrator supplies a current capability snapshot with available models, efforts, and role-level application paths.
+If a future App snapshot includes Luna and native spawn arguments, the existing standard Generator setting resolves to
+Luna/xhigh without a config migration. Until resume preservation is evidenced for the active surface, routed Codex role
+work uses a fresh non-full-history spawn. Terra remains available for an explicit user override but is never an automatic
+standard, strong, or availability-fallback choice.
 
 ### Browser Verification Priority
 
