@@ -11,6 +11,7 @@ const { parse: parseToml } = require("../vendor/smol-toml/index.cjs");
 const HOSTS = ["claudeCode", "codex"];
 const ROLES = ["planner", "generator", "evaluator"];
 const FIELDS = ["model", "effort"];
+const ESCALATION_FIELDS = ["model", "effort", "after_failures", "on_evaluator_recommendation"];
 const CAPABILITY_FLAGS = ["subagents", "resume", "roleModel", "roleEffort"];
 const CAPABILITY_LISTS = ["models", "efforts"];
 const MAX_DIAGNOSTIC_INPUT_LENGTH = 4096;
@@ -23,9 +24,27 @@ export const DEFAULT_CONFIG = Object.freeze({
     HOSTS.map((host) => [
       host,
       {
-        roles: Object.fromEntries(
-          ROLES.map((role) => [role, { model: "inherit", effort: "inherit" }]),
-        ),
+        roles: Object.fromEntries(ROLES.map((role) => {
+          if (host === "codex" && role === "planner") {
+            return [role, { model: "gpt-5.6-sol", effort: "high" }];
+          }
+          if (host === "codex" && role === "generator") {
+            return [role, {
+              model: "gpt-5.6-luna",
+              effort: "xhigh",
+              escalation: {
+                model: "gpt-5.6-sol",
+                effort: "high",
+                after_failures: 2,
+                on_evaluator_recommendation: true,
+              },
+            }];
+          }
+          if (host === "codex" && role === "evaluator") {
+            return [role, { model: "gpt-5.6-sol", effort: "high" }];
+          }
+          return [role, { model: "inherit", effort: "inherit" }];
+        })),
       },
     ]),
   ),
@@ -34,7 +53,9 @@ export const DEFAULT_CONFIG = Object.freeze({
 const DEFAULT_CAPABILITIES = Object.freeze({
   claudeCode: {
     subagents: true,
-    resume: true,
+    // Follow-up support alone does not prove that a resumed role keeps its
+    // routed model/effort. Require an observed capability snapshot.
+    resume: null,
     roleModel: true,
     // Claude Code effort is applied through agent-definition frontmatter, not
     // a generic per-dispatch control. Keep it unconfirmed until the active
@@ -219,7 +240,37 @@ function validateConfig(config, label, source, warnings, { legacy = false } = {}
     if (!inspectTable(hostValue.roles, `${label}.hosts.${host}.roles`, ROLES)) continue;
     for (const role of ROLES) {
       if (!own(hostValue.roles, role)) continue;
-      inspectTable(hostValue.roles[role], `${label}.hosts.${host}.roles.${role}`, FIELDS);
+      const roleValue = hostValue.roles[role];
+      const allowsEscalation = host === "codex" && role === "generator";
+      if (!inspectTable(
+        roleValue,
+        `${label}.hosts.${host}.roles.${role}`,
+        [...FIELDS, ...(allowsEscalation ? ["escalation"] : [])],
+      )) continue;
+      if (!allowsEscalation || !own(roleValue, "escalation")) continue;
+      const escalationPath = `${label}.hosts.${host}.roles.generator.escalation`;
+      if (!inspectTable(roleValue.escalation, escalationPath, ESCALATION_FIELDS)) continue;
+      const escalation = roleValue.escalation;
+      if (own(escalation, "after_failures")
+        && (!Number.isInteger(escalation.after_failures)
+          || escalation.after_failures < 1
+          || escalation.after_failures >= 3)) {
+        warnings.push(warning(
+          "invalid-config-value",
+          `${escalationPath}.after_failures`,
+          "expected an integer from 1 to 2; 3 consecutive failures stop for user input",
+          { source, input: escalation.after_failures },
+        ));
+      }
+      if (own(escalation, "on_evaluator_recommendation")
+        && typeof escalation.on_evaluator_recommendation !== "boolean") {
+        warnings.push(warning(
+          "invalid-config-value",
+          `${escalationPath}.on_evaluator_recommendation`,
+          "expected true or false",
+          { source, input: escalation.on_evaluator_recommendation },
+        ));
+      }
     }
   }
 }
@@ -285,12 +336,50 @@ function explicitValue(config, host, role, field) {
   return own(roleConfig, field) ? roleConfig[field] : undefined;
 }
 
+function explicitEscalationValue(config, field) {
+  const escalation = config?.hosts?.codex?.roles?.generator?.escalation;
+  return own(escalation, field) ? escalation[field] : undefined;
+}
+
 function chooseValue(personal, shared, host, role, field) {
   const personalValue = explicitValue(personal, host, role, field);
   if (personalValue !== undefined) return { value: personalValue, source: "personal" };
   const sharedValue = explicitValue(shared, host, role, field);
   if (sharedValue !== undefined) return { value: sharedValue, source: "shared" };
-  return { value: "inherit", source: "plugin" };
+  return { value: DEFAULT_CONFIG.hosts[host].roles[role][field], source: "plugin" };
+}
+
+function chooseEscalationValue(personal, shared, field, warnings) {
+  const personalValue = explicitEscalationValue(personal, field);
+  const sharedValue = explicitEscalationValue(shared, field);
+  const defaultValue = DEFAULT_CONFIG.hosts.codex.roles.generator.escalation[field];
+  const selected = personalValue !== undefined
+    ? { value: personalValue, source: "personal" }
+    : sharedValue !== undefined
+      ? { value: sharedValue, source: "shared" }
+      : { value: defaultValue, source: "plugin" };
+  const configPath = `hosts.codex.roles.generator.escalation.${field}`;
+
+  if (field === "after_failures") {
+    if (!Number.isInteger(selected.value) || selected.value < 1 || selected.value >= 3) {
+      return { value: defaultValue, source: "fallback", inputSource: selected.source };
+    }
+  } else if (field === "on_evaluator_recommendation") {
+    if (typeof selected.value !== "boolean") {
+      return { value: defaultValue, source: "fallback", inputSource: selected.source };
+    }
+  } else {
+    const normalized = normalizeRuntimeValue(selected.value);
+    if (typeof normalized !== "string" || !normalized) {
+      warnings.push(warning("invalid-value", configPath, "value must be a non-empty string", {
+        source: selected.source,
+        input: selected.value,
+      }));
+      return { value: defaultValue, source: "fallback", inputSource: selected.source };
+    }
+    selected.value = normalized;
+  }
+  return selected;
 }
 
 function normalizeRuntimeValue(value) {
@@ -413,8 +502,8 @@ function normalizeCapabilities(overrides, warnings, capabilitySource) {
   return { capabilities, sources };
 }
 
-function resolveField({ host, role, field, selected, capabilities, capabilitySources, warnings }) {
-  const configPath = `hosts.${host}.roles.${role}.${field}`;
+function resolveField({ host, role, field, selected, capabilities, capabilitySources, warnings, configPath: explicitPath }) {
+  const configPath = explicitPath ?? `hosts.${host}.roles.${role}.${field}`;
   const rawRequested = selected.value;
   const requested = normalizeRuntimeValue(rawRequested);
 
@@ -466,23 +555,42 @@ function resolveField({ host, role, field, selected, capabilities, capabilitySou
     requested,
     effective: requested,
     source: selected.source,
-    status: "applied",
+    status: "dispatch-ready",
     applicationPath,
+    launchVerified: false,
   };
 }
 
-function lifecycleAction({ mode, event, role, capabilities, capabilitySources, rotate, warnings, host }) {
-  if (role === "planner" && event === "retry" && !rotate.includes(role)) {
+function lifecycleAction({
+  mode,
+  event,
+  role,
+  capabilities,
+  capabilitySources,
+  rotate,
+  warnings,
+  host,
+  route,
+  forceFreshReason,
+}) {
+  if (route.stopReason) return { action: "idle", reason: route.stopReason };
+  if (route.failureKind === "spec-issue" && role !== "planner") {
+    return { action: "idle", reason: "spec issue routes to Planner" };
+  }
+  if (role === "planner" && event === "retry" && route.failureKind !== "spec-issue" && !rotate.includes(role)) {
     return { action: "idle", reason: "implementation retry does not require Planner" };
   }
   if (capabilities.subagents === false) {
     return { action: "isolated-work-unit", reason: "subagents unavailable" };
   }
+  if (forceFreshReason) return { action: "fresh", reason: forceFreshReason };
   if (rotate.includes(role)) return { action: "fresh", reason: "explicit rotation" };
   if (event === "initial") return { action: "fresh", reason: "no prior role session" };
 
   const wantsResume = event === "retry" || mode === "balanced" || role === "planner";
   if (!wantsResume) return { action: "fresh", reason: "fresh mode at Sprint boundary" };
+  // `resume` means more than accepting a follow-up: the observed host path must
+  // preserve the routed model and effort for the resumed turn.
   if (capabilities.resume === true) {
     return { action: "resume", reason: event === "retry" ? "same Sprint retry" : "balanced role reuse" };
   }
@@ -490,8 +598,8 @@ function lifecycleAction({ mode, event, role, capabilities, capabilitySources, r
   const configPath = `lifecycle.${host}.${role}`;
   const code = capabilities.resume === false ? "resume-unsupported" : "resume-unconfirmed";
   const reason = capabilities.resume === false
-    ? `${host} cannot resume this role; starting a new isolated work unit`
-    : `${host} resume capability is unconfirmed; use a new isolated work unit unless the host confirms resume`;
+    ? `${host} cannot preserve routed model/effort on resume; starting a new isolated work unit`
+    : `${host} routing-preserving resume is unconfirmed; use a new isolated work unit unless host metadata confirms it`;
   warnings.push(warning(code, configPath, reason, {
     effective: "isolated-work-unit",
     source: capabilitySources.resume,
@@ -499,6 +607,85 @@ function lifecycleAction({ mode, event, role, capabilities, capabilitySources, r
     causeSource: "capability",
   }));
   return { action: "isolated-work-unit", reason: "resume unavailable or unconfirmed" };
+}
+
+function normalizeRoutingInput({ retryCount, failureKind, evaluatorRecommendation, sprintRisk, currentModelTier }) {
+  if (!Number.isInteger(retryCount) || retryCount < 0) {
+    throw new Error("retryCount must be a non-negative integer");
+  }
+  if (![undefined, null, "implementation-issue", "spec-issue"].includes(failureKind)) {
+    throw new Error("failureKind must be implementation-issue, spec-issue, or omitted");
+  }
+  if (![undefined, null, "standard", "high"].includes(sprintRisk)) {
+    throw new Error("sprintRisk must be standard, high, or omitted");
+  }
+  if (!["unknown", "standard", "strong"].includes(currentModelTier)) {
+    throw new Error("currentModelTier must be unknown, standard, or strong");
+  }
+  if (evaluatorRecommendation !== undefined && evaluatorRecommendation !== null) {
+    if (!evaluatorRecommendation || typeof evaluatorRecommendation !== "object" || Array.isArray(evaluatorRecommendation)) {
+      throw new Error("evaluatorRecommendation must be an object or omitted");
+    }
+    if (evaluatorRecommendation.tier !== "strong"
+      || typeof evaluatorRecommendation.evidenceVerified !== "boolean") {
+      throw new Error("evaluatorRecommendation requires tier=strong and boolean evidenceVerified");
+    }
+  }
+  const normalizedFailure = failureKind ?? null;
+  const stopReason = normalizedFailure === "implementation-issue" && retryCount >= 3
+    ? "three-consecutive-failures"
+    : null;
+  const nextRole = stopReason
+    ? "user"
+    : normalizedFailure === "spec-issue"
+      ? "planner"
+      : "generator";
+  return {
+    retryCount,
+    failureKind: normalizedFailure,
+    evaluatorRecommendation: evaluatorRecommendation ?? null,
+    sprintRisk: sprintRisk ?? "standard",
+    currentModelTier,
+    nextRole,
+    stopReason,
+  };
+}
+
+function requestedModelAvailable(selected, capabilities) {
+  const value = normalizeRuntimeValue(selected.value);
+  return typeof value !== "string"
+    || value.length === 0
+    || value === "inherit"
+    || !Array.isArray(capabilities.models)
+    || capabilities.models.includes(value);
+}
+
+function generatorTierDecision({ route, escalation, standardModel, capabilities }) {
+  if (route.nextRole !== "generator") return { modelTier: null, reason: "generator-not-routed" };
+  if (route.sprintRisk === "high") return { modelTier: "strong", reason: "high-risk-sprint" };
+  if (escalation.onEvaluatorRecommendation.value
+    && route.evaluatorRecommendation?.tier === "strong"
+    && route.evaluatorRecommendation.evidenceVerified === true) {
+    return { modelTier: "strong", reason: "evaluator-recommendation" };
+  }
+  if (route.failureKind === "implementation-issue"
+    && route.retryCount >= escalation.afterFailures.value) {
+    return { modelTier: "strong", reason: "retry-threshold" };
+  }
+  if (!requestedModelAvailable(standardModel, capabilities)) {
+    return { modelTier: "strong", reason: "standard-model-unavailable" };
+  }
+  return {
+    modelTier: "standard",
+    reason: route.retryCount > 0 ? "retry-below-threshold" : "standard",
+  };
+}
+
+function generatorRotateReason({ route, tier }) {
+  if (route.nextRole !== "generator" || tier.modelTier === route.currentModelTier) return null;
+  if (route.currentModelTier === "unknown") return "runtime-migration";
+  if (tier.reason === "standard-model-unavailable") return "model-availability";
+  return "model-escalation";
 }
 
 function validateRotate(rotate) {
@@ -519,6 +706,11 @@ export function resolveRuntimeConfig({
   capabilitySource = "capability",
   capabilityDiagnostics = [],
   rotate = [],
+  retryCount = 0,
+  failureKind,
+  evaluatorRecommendation,
+  sprintRisk = "standard",
+  currentModelTier = "unknown",
 } = {}) {
   const warnings = [...capabilityDiagnostics];
   const normalizedRotate = validateRotate(rotate);
@@ -528,6 +720,24 @@ export function resolveRuntimeConfig({
     warnings,
     capabilitySource,
   );
+  const route = normalizeRoutingInput({
+    retryCount,
+    failureKind,
+    evaluatorRecommendation,
+    sprintRisk,
+    currentModelTier,
+  });
+  const escalation = {
+    model: chooseEscalationValue(personal, shared, "model", warnings),
+    effort: chooseEscalationValue(personal, shared, "effort", warnings),
+    afterFailures: chooseEscalationValue(personal, shared, "after_failures", warnings),
+    onEvaluatorRecommendation: chooseEscalationValue(
+      personal,
+      shared,
+      "on_evaluator_recommendation",
+      warnings,
+    ),
+  };
 
   let lifecycle = own(personal, "lifecycle")
     ? { value: personal.lifecycle, source: "personal" }
@@ -564,16 +774,73 @@ export function resolveRuntimeConfig({
           mustNotShareWith: ROLES.filter((otherRole) => otherRole !== role),
         },
       };
-      for (const field of FIELDS) {
-        settings[field] = resolveField({
+      let forceFreshReason = null;
+      if (host === "codex" && role === "generator") {
+        const standardModel = chooseValue(personal, shared, host, role, "model");
+        const tier = generatorTierDecision({
+          route,
+          escalation,
+          standardModel,
+          capabilities: capabilities[host],
+        });
+        const strong = tier.modelTier === "strong";
+        const modelSelection = strong ? escalation.model : standardModel;
+        settings.model = resolveField({
           host,
           role,
-          field,
-          selected: chooseValue(personal, shared, host, role, field),
+          field: "model",
+          selected: modelSelection,
           capabilities: capabilities[host],
           capabilitySources: capabilitySources[host],
           warnings,
+          configPath: strong
+            ? "hosts.codex.roles.generator.escalation.model"
+            : "hosts.codex.roles.generator.model",
         });
+        const effortSelection = settings.model.effective === "inherit" && modelSelection.value !== "inherit"
+          ? { value: "inherit", source: "fallback" }
+          : strong
+            ? escalation.effort
+            : chooseValue(personal, shared, host, role, "effort");
+        settings.effort = resolveField({
+          host,
+          role,
+          field: "effort",
+          selected: effortSelection,
+          capabilities: capabilities[host],
+          capabilitySources: capabilitySources[host],
+          warnings,
+          configPath: strong
+            ? "hosts.codex.roles.generator.escalation.effort"
+            : "hosts.codex.roles.generator.effort",
+        });
+        settings.routing = {
+          modelTier: tier.modelTier,
+          reason: tier.reason,
+          rotateReason: generatorRotateReason({ route, tier }),
+          afterFailures: escalation.afterFailures.value,
+          onEvaluatorRecommendation: escalation.onEvaluatorRecommendation.value,
+        };
+        if (route.nextRole === "generator" && tier.modelTier !== route.currentModelTier) {
+          forceFreshReason = `model tier change: ${route.currentModelTier} -> ${tier.modelTier}; ${tier.reason}`;
+        }
+      } else {
+        for (const field of FIELDS) {
+          settings[field] = resolveField({
+            host,
+            role,
+            field,
+            selected: chooseValue(personal, shared, host, role, field),
+            capabilities: capabilities[host],
+            capabilitySources: capabilitySources[host],
+            warnings,
+          });
+        }
+        if (role === "generator") {
+          settings.routing = route.nextRole === "generator"
+            ? { modelTier: "standard", reason: "host-default", rotateReason: null }
+            : { modelTier: null, reason: "generator-not-routed", rotateReason: null };
+        }
       }
       settings.lifecycle = lifecycleAction({
         mode: lifecycle.value,
@@ -584,6 +851,8 @@ export function resolveRuntimeConfig({
         rotate: normalizedRotate,
         warnings,
         host,
+        route,
+        forceFreshReason,
       });
       roles[role] = settings;
     }
@@ -616,6 +885,22 @@ export function resolveRuntimeConfig({
       },
     },
     lifecycle: { mode: lifecycle.value, source: lifecycle.source, event, rotate: normalizedRotate },
+    routing: {
+      nextRole: route.nextRole,
+      stopReason: route.stopReason,
+      retryCount: route.retryCount,
+      failureKind: route.failureKind,
+      sprintRisk: route.sprintRisk,
+      currentModelTier: route.currentModelTier,
+      evaluatorRecommendation: route.evaluatorRecommendation,
+    },
+    verification: {
+      configResolved: true,
+      dispatchReadyDoesNotProveLaunch: true,
+      launchVerified: false,
+      launchStatus: "unverified",
+      launchEvidence: null,
+    },
     hosts: resolvedHosts,
     invariants: {
       separateGeneratorEvaluator: true,
@@ -637,7 +922,15 @@ function requireArg(argv, index, flag) {
 }
 
 function parseArgs(argv) {
-  const options = { root: process.cwd(), event: "initial", host: "all", rotate: [] };
+  const options = {
+    root: process.cwd(),
+    event: "initial",
+    host: "all",
+    rotate: [],
+    retryCount: 0,
+    sprintRisk: "standard",
+    currentModelTier: "unknown",
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--root") options.root = path.resolve(requireArg(argv, index++, arg));
@@ -645,9 +938,29 @@ function parseArgs(argv) {
     else if (arg === "--host") options.host = requireArg(argv, index++, arg);
     else if (arg === "--capabilities") options.capabilitiesPath = path.resolve(requireArg(argv, index++, arg));
     else if (arg === "--rotate") options.rotate = requireArg(argv, index++, arg).split(",").map((item) => item.trim()).filter(Boolean);
+    else if (arg === "--retry-count") options.retryCount = Number(requireArg(argv, index++, arg));
+    else if (arg === "--failure-kind") options.failureKind = requireArg(argv, index++, arg);
+    else if (arg === "--evaluator-recommendation") {
+      options.evaluatorRecommendation = {
+        tier: requireArg(argv, index++, arg),
+        evidenceVerified: false,
+      };
+    }
+    else if (arg === "--evaluator-evidence-verified") {
+      options.evaluatorEvidenceVerified = true;
+    }
+    else if (arg === "--sprint-risk") options.sprintRisk = requireArg(argv, index++, arg);
+    else if (arg === "--current-model-tier") options.currentModelTier = requireArg(argv, index++, arg);
     else if (arg === "--json") options.json = true;
     else if (arg === "--help") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
+  }
+  if (options.evaluatorEvidenceVerified) {
+    if (!options.evaluatorRecommendation) {
+      throw new Error("--evaluator-evidence-verified requires --evaluator-recommendation strong");
+    }
+    options.evaluatorRecommendation.evidenceVerified = true;
+    delete options.evaluatorEvidenceVerified;
   }
   return options;
 }
@@ -675,11 +988,12 @@ function readCapabilityFile(file) {
 
 function printText(result) {
   console.log(`Harness runtime: ${result.lifecycle.mode} (${result.lifecycle.source}), event=${result.lifecycle.event}`);
+  console.log(`Routing: next=${result.routing.nextRole}; current-tier=${result.routing.currentModelTier}; stop=${result.routing.stopReason ?? "none"}; launch-verified=false`);
   for (const [host, hostConfig] of Object.entries(result.hosts)) {
     console.log(`\n${host}`);
     for (const [role, roleConfig] of Object.entries(hostConfig.roles)) {
       console.log(
-        `  ${role}: ${roleConfig.lifecycle.action}; model=${roleConfig.model.effective} (${roleConfig.model.source}); effort=${roleConfig.effort.effective} (${roleConfig.effort.source})`,
+        `  ${role}: ${roleConfig.lifecycle.action}; model=${roleConfig.model.effective} (${roleConfig.model.source}); effort=${roleConfig.effort.effective} (${roleConfig.effort.source})${roleConfig.routing ? `; tier=${roleConfig.routing.modelTier}` : ""}`,
       );
     }
   }
@@ -698,6 +1012,12 @@ function usage() {
     `  --event EVENT           initial, sprint-change, or retry\n` +
     `  --capabilities FILE     observed host capabilities JSON file\n` +
     `  --rotate ROLE[,ROLE]    force selected roles fresh\n` +
+    `  --retry-count N         consecutive implementation failures for the Sprint\n` +
+    `  --failure-kind KIND     implementation-issue or spec-issue\n` +
+    `  --evaluator-recommendation strong\n` +
+    `  --evaluator-evidence-verified  confirm recommendation evidence was checked\n` +
+    `  --sprint-risk RISK      standard or high\n` +
+    `  --current-model-tier TIER  unknown, standard, or strong from docs/sprints/state.md\n` +
     `  --json                  machine-readable output\n`;
 }
 

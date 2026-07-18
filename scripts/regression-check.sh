@@ -70,6 +70,36 @@ else
   ng "sync apply is idempotent"
 fi
 
+materialize="$(fresh materialize-upstream)"
+rm "$materialize/docs/proposals/codex-model-routing.md"
+if bash "$materialize/scripts/sync-harness.sh" --apply --offline >/dev/null 2>&1 \
+  && test -f "$materialize/docs/proposals/codex-model-routing.md" \
+  && bash "$materialize/scripts/sync-harness.sh" --check --offline >/dev/null 2>&1; then
+  ok "sync apply materializes missing upstream files"
+else
+  ng "sync apply materializes missing upstream files"
+fi
+
+missing_downstream="$(fresh missing-downstream)"
+rm "$missing_downstream/gentle-overlay/README.md"
+expect_fail "sync apply still rejects missing downstream files" \
+  bash "$missing_downstream/scripts/sync-harness.sh" --apply --offline
+
+yasashii_sections_ok=true
+while IFS=$'\t' read -r target _anchor fragment; do
+  [[ -z "$target" || "$target" == \#* ]] && continue
+  heading="$(grep -m1 '^#' "$ROOT/$fragment")"
+  count="$(grep -Fxc "$heading" "$ROOT/$target" || true)"
+  if [[ "$count" -ne 1 ]]; then
+    yasashii_sections_ok=false
+  fi
+done < "$ROOT/gentle-overlay/anchors.tsv"
+if [[ "$yasashii_sections_ok" == true ]]; then
+  ok "all yasashii sections are preserved exactly once"
+else
+  ng "all yasashii sections are preserved exactly once"
+fi
+
 anchor="$(fresh missing-anchor)"
 python3 - "$anchor/gentle-overlay/anchors.tsv" <<'PY'
 from pathlib import Path

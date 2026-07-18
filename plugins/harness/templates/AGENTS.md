@@ -43,6 +43,8 @@ If the host cannot dispatch subagents, run the three roles as strictly separated
 Do not cross these ownership boundaries. If a role finds a problem outside its file, record it in its own handoff instead of editing another role's source of truth.
 Sprint statuses in `state.md` are: `planned`, `active`, `awaiting-eval`, `done`, `deferred`, `superseded`. Never skip or reorder sprints silently; record `deferred`/`superseded` with a reason.
 An older `docs/sprints/current.md` is a legacy pointer: convert it into `docs/sprints/state.md` once, then treat it as read-only reference. If an older `docs/progress.md` exists, treat it as a legacy reference log and do not append new sprint progress there.
+If an existing `state.md` has no `Model Tier`, pass `unknown` to the resolver once, persist only the returned `standard` or `strong` tier with `Rotate: runtime-migration`, and fresh-dispatch Generator. Never persist `unknown`. If only `Rotate` is absent, add `Rotate: none`.
+For a real Generator tier change, use the resolver's rotate reason: `model-escalation` for failure/risk/recommendation routing and `model-availability` for an unavailable standard-model fallback. When Generator is not the next role, its routing tier is null and must not replace the last dispatched tier in state.
 Use zero-padded sprint IDs. Do not create decimal sprint IDs such as `sprint-5.1` or `sprint-5.10`.
 For work between main sprints, use `sprint-NNN-patch-PPP`.
 
@@ -100,8 +102,8 @@ Do not declare completion only because code was written. A sprint is complete on
 
 ## Model Policy
 
-Do not pin this workflow to a host-specific model name in reusable guidance. Inherit the user's current model by default. If the host supports role-specific model choice and the user wants quality over cost, Planner and Evaluator may use the strongest available reasoning model for that host.
+Do not infer or translate model names across hosts. Claude Code inherits the user's current model and effort by default. Codex runtime defaults are Planner `gpt-5.6-sol` / `high`, Generator `gpt-5.6-luna` / `xhigh`, and Evaluator `gpt-5.6-sol` / `high`; they apply only through a confirmed role-level dispatch surface. A dispatch-ready resolver value is not proof of the model that actually launched.
 
 Shared Harness runtime settings live in `.harness/config.toml`; personal leaf overrides live in the git-ignored
-`.harness/config.local.toml`. The default lifecycle is `balanced`, and model/effort inherit from the parent session.
+`.harness/config.local.toml`. The default lifecycle is `balanced`. A high-risk Sprint, the second consecutive implementation failure, or an evidence-verified Evaluator recommendation selects the strong tier. A tier change always starts fresh. The same tier may resume only when host metadata proves that resume preserves the routed model and effort; follow-up support alone is insufficient. The third consecutive failure stops for user input; a spec issue returns to Planner without consuming Generator escalation.
 Never overwrite existing guidance, `.claude/agents/`, `.codex/agents/`, or Harness configuration to apply these settings.

@@ -11,14 +11,17 @@ const TARGET_PATHS = [
   "AGENTS.md",
   "CLAUDE.md",
   "docs/KNOWLEDGE.md",
+  "docs/proposals/codex-model-routing.md",
   ".claude-plugin/marketplace.json",
   ".agents/plugins/marketplace.json",
   "plugins/harness/.claude-plugin/plugin.json",
   "plugins/harness/.codex-plugin/plugin.json",
   "plugins/harness/skills/using-harness/SKILL.md",
   "plugins/harness/skills/harness-loop/SKILL.md",
+  "plugins/harness/agents/evaluator.md",
   "plugins/harness/commands/harness.md",
   "plugins/harness/hooks/session-start.sh",
+  "plugins/harness/templates/docs/harness-guidance.md",
 ];
 
 function parseArgs(argv) {
@@ -82,9 +85,12 @@ function validatePositioning(repoRoot) {
   const claude = read("CLAUDE.md");
   const skill = read("plugins/harness/skills/using-harness/SKILL.md");
   const loop = read("plugins/harness/skills/harness-loop/SKILL.md");
+  const evaluator = read("plugins/harness/agents/evaluator.md");
   const command = read("plugins/harness/commands/harness.md");
   const hook = read("plugins/harness/hooks/session-start.sh");
   const knowledge = read("docs/KNOWLEDGE.md");
+  const proposal = read("docs/proposals/codex-model-routing.md");
+  const harnessGuidance = read("plugins/harness/templates/docs/harness-guidance.md");
   const claudeManifest = json("plugins/harness/.claude-plugin/plugin.json");
   const codexManifest = json("plugins/harness/.codex-plugin/plugin.json");
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
@@ -92,7 +98,7 @@ function validatePositioning(repoRoot) {
 
   check("README positioning and local override guidance", () => {
     includesAll("README.md", readme, [
-      "短い指示は入口。大きな開発を継続的に前へ進めることが本体。",
+      "入力の短さは始めやすさであり、開発規模の上限ではありません。",
       "Planner / Generator / Evaluator の3 role",
       "### 短い新規開発の例",
       "### 既存repoを継続する例",
@@ -106,6 +112,26 @@ function validatePositioning(repoRoot) {
       "host既定",
     ]);
     appearsNear("README.md", readme, "ホストが対応する場合は複数Agent", "roleごとの独立作業単位");
+  });
+
+  check("README separates Codex routing readiness from verified launch", () => {
+    includesAll("README.md", readme, [
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "Model Tier: strong",
+      "Rotate: model-escalation",
+      "dispatch-ready",
+      "launch-verified",
+      "unverified",
+      "3回目の連続失敗",
+      "spec-issue",
+      "Terra",
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      "Unknown model",
+      "フル経路",
+    ]);
   });
 
   check("using-harness triggers and role fallback", () => {
@@ -154,6 +180,52 @@ function validatePositioning(repoRoot) {
     ]);
   });
 
+  check("runtime knowledge and Evaluator contract describe escalation boundaries", () => {
+    includesAll("docs/KNOWLEDGE.md", knowledge, [
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "Model Tier: standard | strong",
+      "Rotate: model-escalation",
+      "dispatch-ready",
+      "launch-verified",
+      "Terra",
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      "full role-model routing",
+    ]);
+    includesAll("plugins/harness/skills/harness-loop/SKILL.md", loop, [
+      "2026-07-18",
+      "Codex CLI",
+      "Codex App",
+      'fork_turns: "none"',
+      "gpt-5.6-luna",
+      "Unknown model",
+    ]);
+    includesAll("plugins/harness/agents/evaluator.md", evaluator, [
+      "評価＋自己レビュー",
+      "Escalation Recommendation: strong",
+      "Escalation Evidence",
+      "オーケストレーター",
+      "実装やコード修正は行わない",
+    ]);
+  });
+
+  check("resume guidance requires routing-preservation evidence", () => {
+    includesAll("docs/proposals/codex-model-routing.md", proposal, [
+      "resume: true",
+      "model / effort保持",
+      "host metadata",
+      "freshなLuna Generator",
+    ]);
+    includesAll("plugins/harness/templates/docs/harness-guidance.md", harnessGuidance, [
+      "resume: true",
+      "routed model/effort",
+      "Follow-up support alone is insufficient",
+      "fresh role work unit",
+    ]);
+  });
+
   check("plugin manifests describe long-running role separation", () => {
     for (const [relativePath, manifest] of [
       ["plugins/harness/.claude-plugin/plugin.json", claudeManifest],
@@ -161,6 +233,12 @@ function validatePositioning(repoRoot) {
     ]) {
       includesAll(relativePath, manifest.description, ["file-backed", "multi-sprint", "long-running development", "roles"]);
     }
+  });
+
+  check("plugin and marketplace versions stay synchronized", () => {
+    assert.equal(claudeManifest.version, codexManifest.version);
+    assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
+    assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);
   });
 
   check("marketplaces describe the same product", () => {

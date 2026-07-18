@@ -1,51 +1,107 @@
-# Agentic Harness runtime configuration shared by this repository.
-# Put personal leaf-only overrides in .harness/config.local.toml; that file is git-ignored.
-# Resolution order is: personal explicit leaf > shared explicit leaf > plugin default.
+# EN: Shared Agentic Harness runtime intent for this repository. Put personal leaf-only overrides
+# EN: in .harness/config.local.toml; that file is git-ignored. Resolution order is personal leaf,
+# EN: shared leaf, then plugin default.
+# JA: このリポジトリで共有するAgentic Harnessのruntime方針です。個人用の差分はgit管理外の
+# JA: .harness/config.local.tomlへ必要なleafだけ書きます。優先順は個人、共有、plugin既定です。
 #
-# lifecycle = "balanced" reuses the same role between Sprints when the host can resume it.
-# lifecycle = "fresh" starts fresh Generator and Evaluator work at a new Sprint boundary,
-# while a retry inside the same Sprint resumes the existing role when the host supports it.
-# Generator and Evaluator always remain separate roles/work units in both modes.
+# EN: lifecycle controls when role work is reused. lifecycle = "balanced" reuses a role only when the
+# EN: host can resume it while preserving its routed model/effort. A retry inside the same Sprint resumes
+# EN: only when that preservation is verified. "fresh" rotates Generator and Evaluator at
+# EN: a new Sprint boundary. Generator and Evaluator always remain separate work units.
+# JA: lifecycleはroleを再利用する範囲を決めます。"balanced"はhostがmodel/effortを保ったまま
+# JA: 再開できる場合だけ再利用します。"fresh"は新SprintでGeneratorとEvaluatorを新しくします。
+# JA: どちらでもGeneratorとEvaluatorは別の作業単位です。
 #
-# model = "inherit" or effort = "inherit" means Harness passes no role override.
-# The role therefore inherits the model/effort of the parent main session—the current chat
-# running Harness—or the host default when that parent session has no explicit override.
-# If the host cannot apply a role override, Harness warns and safely falls back to inherit.
-# Model identifiers are trimmed only; ambiguous names are never fuzzy-matched, translated,
-# corrected, or automatically replaced with a candidate.
+# EN: model = "inherit" or effort = "inherit" sends no role override. The role inherits the parent main session—the current chat—
+# EN: or the host default. Unsupported values warn and fall back safely. Model
+# EN: identifiers are trimmed only and are never fuzzy-matched, translated, or replaced by a guess.
+# JA: modelまたはeffortの"inherit"はrole別overrideを渡さない指定です。現在の親チャット、または
+# JA: host既定を継承します。未対応値は警告付きで安全にfallbackします。model名は前後空白だけを除き、
+# JA: 曖昧一致、別host名への変換、推測補正は行いません。
 #
-# Official references (use each URL for the stated purpose):
-# OpenAI API model IDs and capabilities: https://developers.openai.com/api/docs/models
-# Codex model availability: https://developers.openai.com/codex/models
-# Codex model/effort configuration: https://developers.openai.com/codex/config-reference
-# Codex subagent controls and limits: https://developers.openai.com/codex/subagents
-# Anthropic model IDs and capabilities: https://docs.anthropic.com/en/docs/about-claude/models/overview
-# Claude Code model selection/configuration: https://code.claude.com/docs/en/model-config
-# Claude Code subagent model controls: https://code.claude.com/docs/en/sub-agents
+# EN: The Orchestrator is the current main chat; this file cannot change that chat's model. For Codex,
+# EN: start the main chat with gpt-5.6-sol / medium, or high for high-risk work.
+# JA: OrchestratorはHarnessを実行している現在の本チャットです。このファイルから本チャットのmodelは
+# JA: 変更できません。CodexではSol/medium、高リスク作業ではSol/highでの開始を推奨します。
+#
+# EN: As verified on 2026-07-18, Codex CLI supports the full role-model routing path with native fresh
+# EN: subagents, including Luna/xhigh. Codex App supports explicit fresh Sol/Terra routing, but rejects
+# EN: Luna with "Unknown model". These are observed capabilities, not permanent product assumptions.
+# JA: 2026-07-18時点では、Codex CLIでnativeなfresh Subagentへのrole別model/effort指定をフル経路で
+# JA: 確認済みです（Luna/xhighを含む）。Codex AppはfreshなSol/Terra指定を確認済みですが、Lunaは
+# JA: "Unknown model"で拒否されます。これは現在の観測結果であり、固定的な製品仕様とは扱いません。
+#
+# EN: Values below become dispatch-ready only with an observed role-level application path and an
+# EN: available-value list for the current surface. Resolver output alone is not launch evidence;
+# EN: launch-verified requires host session metadata or a host trace.
+# JA: 以下の値は、現在の実行面でroleへ渡す経路と利用可能値一覧を確認できた場合だけdispatch-readyです。
+# JA: resolver出力だけでは実起動の証拠になりません。launch-verifiedにはhost metadataかtraceが必要です。
+#
+# EN: If standard Luna is unavailable, Generator tries the configured strong Sol/high pair. If Sol is
+# EN: also unavailable, both leaves inherit with a warning. Terra is never selected automatically for
+# EN: standard, escalation, or availability fallback; an explicit user override may still use it.
+# JA: 通常GeneratorのLunaが利用不能なら、設定済みのstrong Sol/highを試します。Solも利用不能なら
+# JA: model/effortを警告付きでinheritへ戻します。Harnessは通常、昇格、利用不能fallbackのどこでも
+# JA: Terraを自動選択しません。ユーザーが明示設定したTerraはhostで利用可能なら適用できます。
+#
+# EN: Official references / 公式リファレンス（用途別）:
+# EN: OpenAI API model IDs and capabilities: https://developers.openai.com/api/docs/models
+# EN: Codex model availability: https://developers.openai.com/codex/models
+# EN: Codex model/effort configuration: https://developers.openai.com/codex/config-reference
+# EN: Codex subagent controls and limits: https://developers.openai.com/codex/subagents
+# EN: Anthropic model IDs and capabilities: https://docs.anthropic.com/en/docs/about-claude/models/overview
+# EN: Claude Code model selection/configuration: https://code.claude.com/docs/en/model-config
+# EN: Claude Code subagent model controls: https://code.claude.com/docs/en/sub-agents
 
+# EN: Config schema version. / JA: 設定schemaのversionです。
 version = 1
+
+# EN: Role reuse policy; see the bilingual lifecycle explanation above.
+# JA: role再利用方針です。上の日英lifecycle説明を参照してください。
 lifecycle = "balanced"
 
+# EN: Claude Code Planner inherits the user's current host model/effort by default.
+# JA: Claude CodeのPlannerは既定でユーザーの現在のhost model/effortを継承します。
 [hosts.claudeCode.roles.planner]
 model = "inherit"
 effort = "inherit"
 
+# EN: Claude Code Generator inherits by default; write host-valid explicit values only when desired.
+# JA: Claude CodeのGeneratorも既定は継承です。必要な場合だけhostで有効な正式値を指定します。
 [hosts.claudeCode.roles.generator]
 model = "inherit"
 effort = "inherit"
 
+# EN: Claude Code Evaluator inherits by default and remains separate from Generator.
+# JA: Claude CodeのEvaluatorも既定は継承し、Generatorとは別Agentとして扱います。
 [hosts.claudeCode.roles.evaluator]
 model = "inherit"
 effort = "inherit"
 
+# EN: Codex Planner target for requirements, acceptance criteria, and rubric design.
+# JA: 要件、受入条件、rubricを設計するCodex Plannerの希望model/effortです。
 [hosts.codex.roles.planner]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-sol"
+effort = "high"
 
+# EN: Standard Codex Generator target for normal implementation and the first implementation retry.
+# JA: 通常実装と1回目のimplementation retryで使うCodex Generatorの希望model/effortです。
 [hosts.codex.roles.generator]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-luna"
+effort = "xhigh"
 
+# EN: Strong Generator target and automatic escalation gates. after_failures counts consecutive
+# EN: implementation failures in one Sprint; on_evaluator_recommendation requires verified evidence.
+# JA: strong Generatorの希望値と自動昇格条件です。after_failuresは同一Sprintの連続実装失敗数、
+# JA: on_evaluator_recommendationは証拠確認済みEvaluator推薦を昇格条件に含めるかを決めます。
+[hosts.codex.roles.generator.escalation]
+model = "gpt-5.6-sol"
+effort = "high"
+after_failures = 2
+on_evaluator_recommendation = true
+
+# EN: Codex Evaluator target for evidence-backed evaluation plus self-review; it never implements fixes.
+# JA: 証拠付き評価と自己レビューを行うCodex Evaluatorの希望値です。Evaluatorは実装修正を行いません。
 [hosts.codex.roles.evaluator]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-sol"
+effort = "high"
