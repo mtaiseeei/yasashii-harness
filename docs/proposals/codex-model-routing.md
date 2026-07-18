@@ -1,6 +1,6 @@
 # Codex model routing と自動昇格の実装提案
 
-Status: Proposal / 未実装  
+Status: Implemented in v0.4.0 / resolver・orchestration実装済み、実起動確認はhost依存
 対象: `agentic-harness` plugin本体  
 対象外: Harnessを導入済みの各repoへの反映・移行
 

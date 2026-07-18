@@ -17,6 +17,7 @@ const TARGET_PATHS = [
   "plugins/harness/.codex-plugin/plugin.json",
   "plugins/harness/skills/using-harness/SKILL.md",
   "plugins/harness/skills/harness-loop/SKILL.md",
+  "plugins/harness/agents/evaluator.md",
   "plugins/harness/commands/harness.md",
   "plugins/harness/hooks/session-start.sh",
 ];
@@ -82,6 +83,7 @@ function validatePositioning(repoRoot) {
   const claude = read("CLAUDE.md");
   const skill = read("plugins/harness/skills/using-harness/SKILL.md");
   const loop = read("plugins/harness/skills/harness-loop/SKILL.md");
+  const evaluator = read("plugins/harness/agents/evaluator.md");
   const command = read("plugins/harness/commands/harness.md");
   const hook = read("plugins/harness/hooks/session-start.sh");
   const knowledge = read("docs/KNOWLEDGE.md");
@@ -106,6 +108,21 @@ function validatePositioning(repoRoot) {
       "host既定",
     ]);
     appearsNear("README.md", readme, "ホストが対応する場合は複数Agent", "roleごとの独立作業単位");
+  });
+
+  check("README separates Codex routing readiness from verified launch", () => {
+    includesAll("README.md", readme, [
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "Model Tier: strong",
+      "Rotate: model-escalation",
+      "dispatch-ready",
+      "launch-verified",
+      "unverified",
+      "3回目の連続失敗",
+      "spec-issue",
+      "Terra",
+    ]);
   });
 
   check("using-harness triggers and role fallback", () => {
@@ -154,6 +171,25 @@ function validatePositioning(repoRoot) {
     ]);
   });
 
+  check("runtime knowledge and Evaluator contract describe escalation boundaries", () => {
+    includesAll("docs/KNOWLEDGE.md", knowledge, [
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "Model Tier: standard | strong",
+      "Rotate: model-escalation",
+      "dispatch-ready",
+      "launch-verified",
+      "Terra",
+    ]);
+    includesAll("plugins/harness/agents/evaluator.md", evaluator, [
+      "評価＋自己レビュー",
+      "Escalation Recommendation: strong",
+      "Escalation Evidence",
+      "オーケストレーター",
+      "実装やコード修正は行わない",
+    ]);
+  });
+
   check("plugin manifests describe long-running role separation", () => {
     for (const [relativePath, manifest] of [
       ["plugins/harness/.claude-plugin/plugin.json", claudeManifest],
@@ -161,6 +197,12 @@ function validatePositioning(repoRoot) {
     ]) {
       includesAll(relativePath, manifest.description, ["file-backed", "multi-sprint", "long-running development", "roles"]);
     }
+  });
+
+  check("plugin and marketplace versions stay synchronized", () => {
+    assert.equal(claudeManifest.version, codexManifest.version);
+    assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
+    assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);
   });
 
   check("marketplaces describe the same product", () => {

@@ -14,6 +14,15 @@
 # Model identifiers are trimmed only; ambiguous names are never fuzzy-matched, translated,
 # corrected, or automatically replaced with a candidate.
 #
+# The Orchestrator is the current main chat. Harness cannot change that chat's model from
+# this file. For Codex, start the main chat with gpt-5.6-sol / medium, or high for high-risk work.
+# Codex role values below become dispatch-ready only when the host exposes a confirmed role-level
+# application path. Resolver output does not prove that an Agent launched with that model/effort;
+# launch verification requires host session metadata or a host trace.
+# If Luna is confirmed unavailable, Generator falls back to Sol / high. If Sol is also unavailable,
+# both leaves fall back to inherit with a warning. Terra is not automatically selected by Harness
+# in the standard, escalation, or availability-fallback route.
+#
 # Official references (use each URL for the stated purpose):
 # OpenAI API model IDs and capabilities: https://developers.openai.com/api/docs/models
 # Codex model availability: https://developers.openai.com/codex/models
@@ -39,13 +48,19 @@ model = "inherit"
 effort = "inherit"
 
 [hosts.codex.roles.planner]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-sol"
+effort = "high"
 
 [hosts.codex.roles.generator]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-luna"
+effort = "xhigh"
+
+[hosts.codex.roles.generator.escalation]
+model = "gpt-5.6-sol"
+effort = "high"
+after_failures = 2
+on_evaluator_recommendation = true
 
 [hosts.codex.roles.evaluator]
-model = "inherit"
-effort = "inherit"
+model = "gpt-5.6-sol"
+effort = "high"
