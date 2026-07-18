@@ -4,6 +4,8 @@ This document preserves the background, references, and design decisions behind 
 
 For usage, see `README.md`. For the runtime loop, see `plugins/harness/skills/harness-loop/SKILL.md`.
 
+Active implementation proposal: [`Codex model routing と自動昇格`](proposals/codex-model-routing.md).
+
 ## Summary
 
 **A short instruction is the entry point. Keeping substantial development moving over time is the core product.**
