@@ -215,6 +215,15 @@ Instead:
 - `/harness` initialization may generate guidance files only when they do not already exist.
 - If custom guidance files exist, harness initialization writes `docs/harness-guidance.md` with a suggested block.
 
+Initialization and development start are separate user intents. Claude Code exposes `/harness init` and `/harness check`;
+Codex routes `$using-harness init`, `$using-harness check`, and equivalent natural-language requests through the same bundled
+`scripts/harness.mjs`. `init` reuses `init-guidance.sh` after a complete destination preflight. `check` is read-only and reports
+safe gaps separately from unsafe path conflicts. Both stop before Planner or Sprint work begins.
+
+This surface intentionally does not infer whether existing files are current. A future `upgrade` needs migration policy for
+repo-owned guidance and configuration, so it remains separate and is not implemented. The bundled command requires no target
+repository package manifest, lockfile, dependency directory, or network access.
+
 ### No Target-Repository Dependency Installation
 
 The core method does not require another plugin. Its TOML parser is fixed and bundled inside this plugin, so target
@@ -294,9 +303,16 @@ JSON file with `--capabilities <file>`; unknown fields stay null or omitted. Ava
 conservative inheritance rather than a false applied state.
 
 The resolver calls a value `dispatch-ready` only when availability and a concrete role-level application path are both
-present. That result is not launch evidence. `launch-verified` requires model/effort metadata from the host session,
-trace, or dispatch record; without it, actual Subagent launch remains unverified. The orchestrator is the current main
-chat, not a spawned role, so runtime config never claims to change its model.
+present. When the application path is confirmed but the active surface does not enumerate available values, it returns
+`dispatch-attempt`: the configured value may be tried on the actual role, but support and launch remain unverified.
+Codex is never asked to infer whether it is running in App or CLI. Only an explicit synchronous host refusal before child
+creation is fed back through `--launch-rejected-model` or `--launch-rejected-effort`. An implementation failure, child
+crash, timeout, network error, or ambiguous creation result is not launch-rejection evidence. Standard Generator model
+rejection reroutes fresh to the configured strong pair with `Rotate: model-availability`; rejection of the strong model
+falls back to inheritance. Planner and Evaluator rejected leaves also inherit. Terra and shell-level `codex exec` are not
+automatic fallbacks. Neither resolver status is launch evidence. `launch-verified` requires model/effort metadata from
+the host session, trace, or dispatch record; without it, actual Subagent launch remains unverified. The orchestrator is
+the current main chat, not a spawned role, so runtime config never claims to change its model.
 
 `scripts/resolve-runtime-config.mjs` loads the bundled `smol-toml@1.7.0` parser and defines merge/fallback behavior;
 `scripts/check-runtime-config.mjs` protects defaults, partial override, host isolation, lifecycle, invalid settings,
@@ -346,23 +362,30 @@ model and effort unless the user supplies a host-valid explicit override. Codex 
 above, but only through a confirmed Codex custom-agent or spawn surface. Codex names are never translated into Claude
 names. A config or resolver value alone is not proof that a Subagent launched with it.
 
-#### Verified Codex surface matrix (2026-07-18)
+#### Verified Codex surface matrix (2026-07-18; routing response refined through 2026-07-20)
 
 The full role-model routing path is currently verified on Codex CLI: a Sol/high CLI parent used native `spawn_agent`
 with `fork_turns: "none"` to launch a fresh Luna/xhigh child, and the child rollout metadata recorded
 `gpt-5.6-luna` / `xhigh`. This was a native CLI subagent launch, not a shell-level direct `codex exec -m luna` substitute.
+On CLI 0.144.6 the displayed spawn schema omitted `model`, `reasoning_effort`, and `agent_type`, while the runtime parser
+accepted them. Harness therefore performs one exact real-role `dispatch-attempt` instead of treating schema omission alone
+as lack of support. `agent_type` selects a custom agent; `agent_role` is output metadata and is never a dispatch input.
+This applies to every exact model/effort selected by shared config, personal config, or an explicit user request, not only
+the bundled Luna/Sol defaults. Harness does not rename or guess the value, and launch verification requires matching child
+host metadata.
 
 Codex App is partially capable on the same date. Fresh Sol/high and Terra/xhigh overrides matched child metadata, while
-an explicit Luna request failed with `Unknown model`. A follow-up turn on completed Sol/high and Terra/xhigh children
+an explicit Luna request still failed with `Unknown model` on 2026-07-20. A follow-up turn on completed Sol/high and Terra/xhigh children
 recorded Sol/low, so App resume is not treated as preserving routed model/effort. This is observed runtime evidence,
 not a permanent product rule.
 
 Shared `.harness/config.toml` therefore expresses desired role values only; it does not duplicate App and CLI settings.
 The orchestrator supplies a current capability snapshot with available models, efforts, and role-level application paths.
-If a future App snapshot includes Luna and native spawn arguments, the existing standard Generator setting resolves to
-Luna/xhigh without a config migration. Until resume preservation is evidenced for the active surface, routed Codex role
-work uses a fresh non-full-history spawn. Terra remains available for an explicit user override but is never an automatic
-standard, strong, or availability-fallback choice.
+It does not rely on the model's self-identification of App versus CLI. If availability is not enumerable, native dispatch
+tries the resolved values on the real role and feeds back only a pre-child-creation refusal. If a future App accepts Luna,
+the existing standard Generator setting succeeds without a config migration. Until resume preservation is evidenced for
+the active surface, routed Codex role work uses a fresh non-full-history spawn. Terra remains available for an explicit
+user override but is never an automatic standard, strong, or availability-fallback choice.
 
 ### Browser Verification Priority
 

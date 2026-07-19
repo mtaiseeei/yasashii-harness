@@ -20,6 +20,7 @@ const TARGET_PATHS = [
   "plugins/harness/skills/harness-loop/SKILL.md",
   "plugins/harness/agents/evaluator.md",
   "plugins/harness/commands/harness.md",
+  "plugins/harness/scripts/harness.mjs",
   "plugins/harness/hooks/session-start.sh",
   "plugins/harness/templates/docs/harness-guidance.md",
 ];
@@ -87,6 +88,7 @@ function validatePositioning(repoRoot) {
   const loop = read("plugins/harness/skills/harness-loop/SKILL.md");
   const evaluator = read("plugins/harness/agents/evaluator.md");
   const command = read("plugins/harness/commands/harness.md");
+  const harnessCommand = read("plugins/harness/scripts/harness.mjs");
   const hook = read("plugins/harness/hooks/session-start.sh");
   const knowledge = read("docs/KNOWLEDGE.md");
   const proposal = read("docs/proposals/codex-model-routing.md");
@@ -128,6 +130,8 @@ function validatePositioning(repoRoot) {
   check("using-harness triggers and role fallback", () => {
     includesAll("plugins/harness/skills/using-harness/SKILL.md", skill, [
       "大きな開発を継続",
+      "Harnessを初期化して",
+      "Harnessの導入状態を確認して",
       "次Sprint・Patch",
       "次のSprintを進めて",
       "非管理下のリポジトリ",
@@ -161,6 +165,46 @@ function validatePositioning(repoRoot) {
     ]);
   });
 
+  check("explicit init and check commands stay separate from the development loop", () => {
+    includesAll("README.md", readme, [
+      "/harness init",
+      "$using-harness init",
+      "/harness check",
+      "$using-harness check",
+      "PlannerやSprintは開始しません",
+      "upgrade",
+    ]);
+    includesAll("plugins/harness/commands/harness.md", command, [
+      "/harness init",
+      "/harness check",
+      "Harnessの安全な初期化・導入確認",
+      "argument-hint: <作りたいもの> | init | check",
+      "PlannerやSprintを開始せず",
+      "harness-loop に進まない",
+    ]);
+    assert.ok(
+      !command.includes("init-guidance.sh"),
+      "plugins/harness/commands/harness.md: normal /harness flow must not bypass harness.mjs preflight",
+    );
+    const commandInitCli = 'node "$CLAUDE_PLUGIN_ROOT/scripts/harness.mjs" init --root "$(pwd)"';
+    assert.ok(
+      command.split(commandInitCli).length - 1 >= 2,
+      "plugins/harness/commands/harness.md: init CLI must cover both explicit init and normal idea setup",
+    );
+    includesAll("plugins/harness/skills/using-harness/SKILL.md", skill, [
+      "$using-harness init",
+      "$using-harness check",
+      "PlannerやSprintを開始せず",
+      "harness-loop`へ進まない",
+    ]);
+    includesAll("plugins/harness/scripts/harness.mjs", harnessCommand, [
+      "init",
+      "check",
+      "upgrade is not implemented",
+      "no Planner or Sprint was started",
+    ]);
+  });
+
   check("KNOWLEDGE positioning rationale", () => {
     includesAll("docs/KNOWLEDGE.md", knowledge, [
       "A short instruction is the entry point. Keeping substantial development moving over time is the core product.",
@@ -186,7 +230,7 @@ function validatePositioning(repoRoot) {
       "full role-model routing",
     ]);
     includesAll("plugins/harness/skills/harness-loop/SKILL.md", loop, [
-      "2026-07-18",
+      "2026-07-20",
       "Codex CLI",
       "Codex App",
       'fork_turns: "none"',
@@ -285,6 +329,7 @@ function validatePositioning(repoRoot) {
     ["plugins/harness/skills/using-harness/SKILL.md", skill],
     ["plugins/harness/skills/harness-loop/SKILL.md", loop],
     ["plugins/harness/commands/harness.md", command],
+    ["plugins/harness/scripts/harness.mjs", harnessCommand],
     ["plugins/harness/hooks/session-start.sh", hook],
     ["docs/KNOWLEDGE.md", knowledge],
     ["plugins/harness/.claude-plugin/plugin.json", JSON.stringify(claudeManifest)],

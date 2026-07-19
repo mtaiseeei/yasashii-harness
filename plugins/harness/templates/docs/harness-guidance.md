@@ -35,7 +35,17 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - Read shared runtime settings from `.harness/config.toml` and optional personal leaf overrides from the git-ignored
   `.harness/config.local.toml`. Default to `balanced`; Claude Code inherits model/effort, while Codex uses the role defaults
   written in the shared config only when a confirmed dispatch surface can accept them. Treat resolver output as
-  dispatch-ready, not launch-verified, until host metadata proves the actual model and effort.
+  dispatch-ready or dispatch-attempt, not launch-verified, until host metadata proves the actual model and effort.
+- Do not ask Codex to identify App versus CLI. Codex CLI may omit `model`, `reasoning_effort`, and `agent_type` from the
+  displayed spawn schema even when its runtime parser accepts them; omission alone must not force inheritance. Dispatch
+  the actual role once with the resolver's exact `dispatch-attempt` values. Use `agent_type`, never `agent_role`, when a
+  custom agent is selected. If and only if the host rejects a model value before child creation, rerun the same-host
+  resolver with `--launch-rejected-model` or `--launch-rejected-effort`. An `unknown field` rejection instead removes that
+  application path from capabilities. Never classify implementation failure as launch rejection, and never auto-fallback
+  to Terra or `codex exec`.
+- Apply this exact-value dispatch contract to every model/effort selected by shared config, personal config, or the user;
+  it is not limited to the bundled Luna/Sol defaults. Never rename or guess a requested model. Mark `launch-verified` only
+  after child host metadata matches the dispatched values.
 - For Codex, use the strong Generator tier for a high-risk Sprint, the second consecutive implementation failure, or an
   evidence-verified Evaluator recommendation. Compare it with the last dispatched tier retained in state; record the new
   `Model Tier` and `Rotate: model-escalation` before fresh dispatch when the desired tier differs.

@@ -42,6 +42,16 @@ codex plugin add harness@yasashii-harness
 明示的に始めたいときは、Claude Code では `/harness`、Codex では `$using-harness` または
 `$harness-loop` を使います（`/harness` コマンドは Claude Code 専用です）。
 
+導入だけ行う場合と、現在の導入状態を確認する場合は次を使います。
+
+| 目的 | Claude Code | Codex |
+|---|---|---|
+| 安全に初期化 | `/harness init` | `$using-harness init` |
+| 変更せず確認 | `/harness check` | `$using-harness check` |
+
+`init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
+`upgrade`はまだ実装していないため、上流更新はこのリポジトリの同期手順で取り込みます。
+
 ## 何をしてくれるか
 
 - **企画（Planner）**: 短い指示から、大事な決めごとを選択式の質問で確認し、仕様とSprint計画に

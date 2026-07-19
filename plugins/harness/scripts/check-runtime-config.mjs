@@ -17,6 +17,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
 const resolver = path.join(scriptDir, "resolve-runtime-config.mjs");
 const initializer = path.join(pluginRoot, "scripts/init-guidance.sh");
+const harnessCommand = path.join(pluginRoot, "scripts/harness.mjs");
 const fixtureRoots = new Set();
 
 function fixture() {
@@ -59,6 +60,10 @@ function sha(file) {
 
 function runInitializer(root) {
   return spawnSync(initializer, [root], { encoding: "utf8" });
+}
+
+function runHarnessCommand(args) {
+  return spawnSync(process.execPath, [harnessCommand, ...args], { encoding: "utf8" });
 }
 
 function runCli(args) {
@@ -134,6 +139,23 @@ function codexAppCapabilities() {
   };
 }
 
+function codexUnknownAvailabilityCapabilities() {
+  return {
+    codex: {
+      subagents: true,
+      resume: null,
+      roleModel: true,
+      roleEffort: true,
+      models: null,
+      efforts: null,
+      applicationPaths: {
+        roleModel: "Codex native spawn_agent model argument",
+        roleEffort: "Codex native spawn_agent reasoning_effort argument",
+      },
+    },
+  };
+}
+
 const checks = [];
 function check(name, run) {
   checks.push({ name, run });
@@ -146,15 +168,24 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.match(source, /parent main session/i);
   assert.match(source, /current chat/i);
   assert.match(source, /never fuzzy-matched/i);
-  assert.match(source, /lifecycle = "balanced" reuses/i);
-  assert.match(source, /retry inside the same Sprint resumes/i);
+  assert.match(source, /Allowed values: "balanced" or "fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
+  assert.match(source, /設定可能値は"balanced"または"fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
+  assert.match(source, /"balanced" reuses a role only when model\/effort-preserving resume is verified/i);
+  assert.match(source, /"fresh" starts[\s\S]{0,120}new Generator and Evaluator work units/i);
+  assert.match(source, /Allowed: "inherit" or an exact Codex model ID[\s\S]{0,180}model = "gpt-5\.6-sol"/i);
+  assert.match(source, /Allowed: "inherit" or an exact Codex effort[\s\S]{0,180}effort = "high"/i);
+  assert.match(source, /Allowed: an integer of 1 or greater[\s\S]{0,180}after_failures = 2/i);
+  assert.match(source, /Allowed: true or false[\s\S]{0,180}on_evaluator_recommendation = true/i);
   assert.match(source, /(?:Orchestrator|オーケストレーター).*(?:cannot|does not|not|変更できない).*model/i);
   assert.match(source, /Luna.*Sol.*inherit/is);
   assert.match(source, /Terra.*(?:never|not|do not|自動選択しない)/i);
   assert.match(source, /# EN:.*lifecycle/is);
   assert.match(source, /# JA:.*lifecycle/is);
   assert.match(source, /# EN:.*Codex CLI.*full role.*routing/is);
-  assert.match(source, /# JA:.*2026-07-18.*Codex CLI.*role別/is);
+  assert.match(source, /# JA:.*2026-07-20.*Codex CLI.*role別/is);
+  assert.match(source, /displayed.*schema.*omit.*runtime parser.*accept/is);
+  assert.match(source, /agent_type.*never agent_role/is);
+  assert.match(source, /every exact model\/effort.*not only.*Luna\/Sol/is);
   assert.match(source, /# EN:.*Planner/is);
   assert.match(source, /# JA:.*Planner/is);
   assert.match(source, /# EN:.*Generator/is);
@@ -190,6 +221,19 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.equal(resolved.hosts.codex.roles.planner.model.requested, "gpt-5.6-sol");
   assert.equal(resolved.hosts.codex.roles.generator.model.requested, "gpt-5.6-luna");
   assert.equal(resolved.hosts.codex.roles.evaluator.model.requested, "gpt-5.6-sol");
+});
+
+check("generated guidance preserves hidden-schema exact dispatch rules", () => {
+  for (const relative of ["templates/AGENTS.md", "templates/CLAUDE.md"]) {
+    const source = fs.readFileSync(path.join(pluginRoot, relative), "utf8");
+    assert.match(source, /displayed spawn schema.*runtime parser accepts/is);
+    assert.match(source, /schema omission alone must not force `inherit`/i);
+    assert.match(source, /resolver's exact `dispatch-attempt` values/i);
+    assert.match(source, /`agent_type`, never `agent_role`/i);
+    assert.match(source, /every exact model\/effort.*not only Luna\/Sol/is);
+    assert.match(source, /`unknown field` rejection.*application path is unavailable/is);
+    assert.match(source, /child host metadata matches the dispatched values/is);
+  }
 });
 
 check("recorded Codex CLI and App capability snapshots resolve without claiming launch verification", () => {
@@ -243,6 +287,155 @@ check("recorded Codex CLI and App capability snapshots resolve without claiming 
   assert.equal(futureApp.hosts.codex.roles.generator.routing.modelTier, "standard");
   assert.notEqual(futureApp.hosts.codex.roles.generator.model.effective, "gpt-5.6-terra");
   assert.equal(futureApp.verification.launchVerified, false);
+});
+
+check("Codex probes the configured role values when spawn arguments exist but App versus CLI availability is unknown", () => {
+  const root = fixture();
+  fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
+  fs.copyFileSync(
+    path.join(pluginRoot, "templates/.harness/config.toml"),
+    path.join(root, ".harness/config.toml"),
+  );
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "standard");
+  assert.equal(generator.model.effective, "gpt-5.6-luna");
+  assert.equal(generator.model.status, "dispatch-attempt");
+  assert.equal(generator.effort.effective, "xhigh");
+  assert.equal(generator.effort.status, "dispatch-attempt");
+  assert.equal(generator.lifecycle.action, "fresh");
+  assert.equal(result.hosts.codex.roles.planner.model.effective, "gpt-5.6-sol");
+  assert.equal(result.hosts.codex.roles.planner.model.status, "dispatch-attempt");
+  assert.equal(result.hosts.codex.roles.planner.effort.effective, "high");
+  assert.equal(result.hosts.codex.roles.evaluator.model.effective, "gpt-5.6-sol");
+  assert.equal(result.hosts.codex.roles.evaluator.model.status, "dispatch-attempt");
+  assert.equal(result.hosts.codex.roles.evaluator.effort.effective, "high");
+  assert.equal(result.verification.launchVerified, false);
+});
+
+check("Codex dispatch-attempt preserves arbitrary configured model and effort values exactly", () => {
+  const root = fixture();
+  writeToml(path.join(root, ".harness/config.toml"), {
+    version: 1,
+    lifecycle: "fresh",
+    hosts: {
+      codex: {
+        roles: {
+          planner: { model: "codex-team-model", effort: "medium" },
+          generator: { model: "codex-personal-model", effort: "high" },
+          evaluator: { model: "codex-team-model", effort: "xhigh" },
+        },
+      },
+    },
+  });
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+  });
+  const roles = result.hosts.codex.roles;
+  assert.deepEqual(
+    [roles.planner.model.effective, roles.generator.model.effective, roles.evaluator.model.effective],
+    ["codex-team-model", "codex-personal-model", "codex-team-model"],
+  );
+  assert.deepEqual(
+    [roles.planner.effort.effective, roles.generator.effort.effective, roles.evaluator.effort.effective],
+    ["medium", "high", "xhigh"],
+  );
+  for (const role of [roles.planner, roles.generator, roles.evaluator]) {
+    assert.equal(role.model.status, "dispatch-attempt");
+    assert.equal(role.effort.status, "dispatch-attempt");
+  }
+});
+
+check("pre-launch rejection handling applies to every Codex role without changing the Generator tier rules", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-sol"],
+    launchRejectedEfforts: ["high"],
+  });
+  assert.equal(result.hosts.codex.roles.planner.model.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.planner.effort.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.evaluator.model.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.evaluator.effort.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.generator.routing.modelTier, "standard");
+  assert.equal(result.hosts.codex.roles.generator.model.effective, "gpt-5.6-luna");
+  assert.equal(result.hosts.codex.roles.generator.effort.effective, "xhigh");
+  assert.equal(result.launchRejections.host, "codex");
+  assert.deepEqual(result.launchRejections.models, ["gpt-5.6-sol"]);
+  assert.deepEqual(result.launchRejections.efforts, ["high"]);
+});
+
+check("a pre-launch Luna rejection reroutes the actual Generator to fresh Sol without trying Terra", () => {
+  const root = fixture();
+  fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
+  fs.copyFileSync(
+    path.join(pluginRoot, "templates/.harness/config.toml"),
+    path.join(root, ".harness/config.toml"),
+  );
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.routing.reason, "standard-model-launch-rejected");
+  assert.equal(generator.routing.rotateReason, "model-availability");
+  assert.equal(generator.model.effective, "gpt-5.6-sol");
+  assert.equal(generator.model.status, "dispatch-attempt");
+  assert.equal(generator.effort.effective, "high");
+  assert.equal(generator.lifecycle.action, "fresh");
+  assert.notEqual(generator.model.effective, "gpt-5.6-terra");
+  assert.ok(result.warnings.some((item) => item.code === "launch-rejected-value"));
+});
+
+check("high-risk routing starts with Sol even when Luna was rejected on the active Codex surface", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    sprintRisk: "high",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.routing.reason, "high-risk-sprint");
+  assert.equal(generator.model.effective, "gpt-5.6-sol");
+  assert.equal(generator.effort.effective, "high");
+});
+
+check("if both configured Codex Generator models are rejected before launch, routing inherits and never selects Terra", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna", "gpt-5.6-sol"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.model.effective, "inherit");
+  assert.equal(generator.effort.effective, "inherit");
+  assert.notEqual(generator.model.effective, "gpt-5.6-terra");
+  assert.ok(result.warnings.some(
+    (item) => item.code === "launch-rejected-value" && /gpt-5\.6-sol/.test(item.reason),
+  ));
 });
 
 check("Codex defaults resolve by role while Claude Code stays inherited", () => {
@@ -795,10 +988,45 @@ check("orchestration contract records model tier before fresh dispatch and keeps
   assert.match(loop, /state\.md[\s\S]{0,500}(?:更新|記録)[\s\S]{0,500}(?:fresh|dispatch)/i);
   assert.match(loop, /Retry Count.*3[\s\S]{0,300}(?:ユーザー|user)/i);
   assert.match(loop, /spec-issue[\s\S]{0,300}Planner/i);
+  assert.match(loop, /App.*CLI.*(?:判定|推定).*(?:しない|不要)/is);
+  assert.match(loop, /公開schema.*(?:表示されなくても|欄が無い).*runtime parser/is);
+  assert.match(loop, /公開schema.*(?:欄が無い|表示されなくても)[\s\S]{0,500}dispatch-attempt/is);
+  assert.match(loop, /agent_type[\s\S]{0,200}agent_role.*(?:渡さない|入力)/is);
+  assert.match(loop, /Luna \/ Sol.*限定しない[\s\S]{0,300}effective.*(?:そのまま|推測)/is);
+  assert.match(loop, /unknown field[\s\S]{0,500}applicationPaths\.roleModel/is);
+  assert.match(loop, /dispatch-attempt[\s\S]{0,500}(?:実際|実role)[\s\S]{0,500}(?:起動|dispatch)/i);
+  assert.match(loop, /(?:Unknown model|起動前)[\s\S]{0,500}--launch-rejected-model[\s\S]{0,500}resolver/is);
+  assert.match(loop, /実装失敗[\s\S]{0,500}launch rejection.*(?:扱わない|渡さない)/is);
   assert.match(evaluator, /評価.*自己レビュー|自己レビュー.*評価/);
   assert.match(evaluator, /Escalation Recommendation:\s*strong/i);
   assert.match(evaluator, /証拠|evidence/i);
   assert.match(evaluator, /(?:実装|コード).*(?:しない|修正しない)/);
+});
+
+check("launch rejection CLI input is explicit, repeatable, and requires one selected host", () => {
+  const root = fixture();
+  const capabilities = path.join(root, "capabilities.json");
+  writeJson(capabilities, codexUnknownAvailabilityCapabilities());
+  const rejected = runCli([
+    "--root", root,
+    "--host", "codex",
+    "--capabilities", capabilities,
+    "--current-model-tier", "standard",
+    "--launch-rejected-model", "gpt-5.6-luna",
+    "--json",
+  ]);
+  assert.equal(rejected.status, 0, rejected.stderr);
+  const result = JSON.parse(rejected.stdout);
+  assert.equal(result.hosts.codex.roles.generator.routing.modelTier, "strong");
+  assert.equal(result.hosts.codex.roles.generator.model.effective, "gpt-5.6-sol");
+
+  const ambiguous = runCli([
+    "--root", root,
+    "--launch-rejected-model", "gpt-5.6-luna",
+    "--json",
+  ]);
+  assert.notEqual(ambiguous.status, 0);
+  assert.match(ambiguous.stderr, /--host/);
 });
 
 check("no config uses balanced plus inherit without overstating Claude effort", () => {
@@ -1453,6 +1681,174 @@ check("initializer creates shared config, preserves custom ignore rules, verifie
   const second = runInitializer(root);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(sha(ignore), digest);
+});
+
+check("harness check is read-only and harness init is idempotent without starting a Sprint", () => {
+  const root = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  fs.writeFileSync(path.join(root, "OWNER.md"), "owner file\n");
+  const before = fs.readdirSync(root).sort();
+
+  const missing = runHarnessCommand(["check", "--root", root]);
+  assert.equal(missing.status, 1, missing.stderr);
+  assert.match(missing.stdout, /Harness check: incomplete/);
+  assert.match(missing.stdout, /missing/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before, "check must not create or update files");
+
+  const initialized = runHarnessCommand(["init", "--root", root]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  assert.match(initialized.stdout, /Agentic Harness guidance initialized/);
+  assert.match(initialized.stdout, /Initialization complete; no Planner or Sprint was started/);
+  assert.equal(fs.readFileSync(path.join(root, "OWNER.md"), "utf8"), "owner file\n");
+  assert.equal(fs.existsSync(path.join(root, "docs/sprints/sprint-001.md")), false);
+
+  const ready = runHarnessCommand(["check", "--root", root]);
+  assert.equal(ready.status, 0, ready.stderr);
+  assert.match(ready.stdout, /Harness check: ready/);
+  assert.match(ready.stdout, /no files were changed/);
+  assert.match(ready.stdout, /^\[present\] AGENTS\.md$/m);
+  assert.match(ready.stdout, /^\[present\] CLAUDE\.md$/m);
+
+  const protectedFiles = [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".harness/config.toml",
+    ".harness/.gitignore",
+    "docs/sprints/state.md",
+  ];
+  const digests = Object.fromEntries(protectedFiles.map((file) => [file, sha(path.join(root, file))]));
+  const second = runHarnessCommand(["init", "--root", root]);
+  assert.equal(second.status, 0, second.stderr);
+  for (const [file, digest] of Object.entries(digests)) {
+    assert.equal(sha(path.join(root, file)), digest, `${file} changed during idempotent init`);
+  }
+});
+
+check("harness check distinguishes preserved custom guidance from present templates", () => {
+  const root = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  fs.writeFileSync(path.join(root, "AGENTS.md"), "# Owner AGENTS\n");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "# Owner CLAUDE\n");
+
+  const initialized = runHarnessCommand(["init", "--root", root]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const checked = runHarnessCommand(["check", "--root", root]);
+  assert.equal(checked.status, 0, checked.stderr);
+  assert.match(checked.stdout, /^\[preserved\] AGENTS\.md /m);
+  assert.match(checked.stdout, /^\[preserved\] CLAUDE\.md /m);
+  assert.equal(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), "# Owner AGENTS\n");
+  assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8"), "# Owner CLAUDE\n");
+});
+
+check("harness check reports would-update and legacy warning without writing", () => {
+  const wouldUpdateRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: wouldUpdateRoot });
+  const initialized = runHarnessCommand(["init", "--root", wouldUpdateRoot]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const ignore = path.join(wouldUpdateRoot, ".harness/.gitignore");
+  fs.writeFileSync(ignore, "owner-rule\nconfig.local.toml\n");
+  const ignoreDigest = sha(ignore);
+  const before = fs.readdirSync(wouldUpdateRoot, { recursive: true }).sort();
+
+  const wouldUpdate = runHarnessCommand(["check", "--root", wouldUpdateRoot]);
+  assert.equal(wouldUpdate.status, 1, wouldUpdate.stderr);
+  assert.match(wouldUpdate.stdout, /^\[would-update\].*config\.local\.json$/m);
+  assert.equal(sha(ignore), ignoreDigest);
+  assert.deepEqual(fs.readdirSync(wouldUpdateRoot, { recursive: true }).sort(), before);
+
+  const legacyRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: legacyRoot });
+  fs.mkdirSync(path.join(legacyRoot, ".harness"));
+  const legacy = path.join(legacyRoot, ".harness/config.json");
+  fs.writeFileSync(legacy, '{"lifecycle":"balanced"}\n');
+  const legacyInit = runHarnessCommand(["init", "--root", legacyRoot]);
+  assert.equal(legacyInit.status, 0, legacyInit.stderr);
+  const legacyDigest = sha(legacy);
+  const legacyBefore = fs.readdirSync(legacyRoot, { recursive: true }).sort();
+
+  const legacyCheck = runHarnessCommand(["check", "--root", legacyRoot]);
+  assert.equal(legacyCheck.status, 0, legacyCheck.stderr);
+  assert.match(legacyCheck.stdout, /^\[preserved\] legacy Harness JSON config$/m);
+  assert.match(legacyCheck.stdout, /^\[warning\] legacy JSON config/m);
+  assert.equal(sha(legacy), legacyDigest);
+  assert.deepEqual(fs.readdirSync(legacyRoot, { recursive: true }).sort(), legacyBefore);
+});
+
+check("harness upgrade is intentionally separate and unsupported commands do not touch the target", () => {
+  const root = fixture();
+  const before = fs.readdirSync(root).sort();
+  const upgrade = runHarnessCommand(["upgrade", "--root", root]);
+  assert.equal(upgrade.status, 2);
+  assert.match(upgrade.stderr, /upgrade is not implemented/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before);
+
+  const unknown = runHarnessCommand(["ship", "--root", root]);
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /unknown command/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before);
+
+  const missingCommand = runHarnessCommand([]);
+  assert.equal(missingCommand.status, 2);
+  assert.match(missingCommand.stderr, /command is required/i);
+});
+
+check("harness init preflights every destination before the legacy initializer can write", () => {
+  const root = fixture();
+  const externalRoot = fixture();
+  const external = path.join(externalRoot, "owner-spec.md");
+  fs.writeFileSync(external, "owner content\n");
+  fs.mkdirSync(path.join(root, "docs"));
+  fs.symlinkSync(external, path.join(root, "docs/spec.md"));
+
+  const before = fs.readdirSync(root, { recursive: true }).sort();
+  const result = runHarnessCommand(["init", "--root", root]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /unsafe/i);
+  assert.deepEqual(fs.readdirSync(root, { recursive: true }).sort(), before);
+  assert.equal(fs.readFileSync(external, "utf8"), "owner content\n");
+  assert.equal(fs.existsSync(path.join(root, ".harness")), false);
+  assert.equal(fs.existsSync(path.join(root, "CLAUDE.md")), false);
+
+  const collisionRoot = fixture();
+  fs.mkdirSync(path.join(collisionRoot, "AGENTS.md"));
+  const collisionBefore = fs.readdirSync(collisionRoot, { recursive: true }).sort();
+  const collision = runHarnessCommand(["init", "--root", collisionRoot]);
+  assert.equal(collision.status, 2);
+  assert.match(collision.stderr, /AGENTS\.md.*regular file/i);
+  assert.deepEqual(fs.readdirSync(collisionRoot, { recursive: true }).sort(), collisionBefore);
+});
+
+check("harness check uses init permission preflight and reports inaccessible paths without a stack", () => {
+  for (const mode of [0o555, 0o000]) {
+    const root = fixture();
+    fs.chmodSync(root, mode);
+    try {
+      for (const command of ["check", "init"]) {
+        const result = runHarnessCommand([command, "--root", root]);
+        assert.equal(result.status, 2, `${command} unexpectedly accepted mode ${mode.toString(8)}`);
+        assert.match(result.stderr, /\[unsafe\]/i);
+        assert.doesNotMatch(result.stderr, /\n\s+at\s+/u, "raw Node stack must not be shown");
+      }
+    } finally {
+      fs.chmodSync(root, 0o700);
+    }
+    assert.deepEqual(fs.readdirSync(root), []);
+  }
+
+  const unreadableRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: unreadableRoot });
+  const initialized = runHarnessCommand(["init", "--root", unreadableRoot]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const ignore = path.join(unreadableRoot, ".harness/.gitignore");
+  fs.chmodSync(ignore, 0o000);
+  try {
+    const checked = runHarnessCommand(["check", "--root", unreadableRoot]);
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /\[unsafe\].*not readable/i);
+    assert.doesNotMatch(checked.stderr, /\n\s+at\s+/u);
+  } finally {
+    fs.chmodSync(ignore, 0o600);
+  }
 });
 
 check("initializer refuses symlink, directory, and unreadable ignore surfaces before other writes", () => {
