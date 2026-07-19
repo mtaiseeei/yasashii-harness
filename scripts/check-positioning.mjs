@@ -96,41 +96,32 @@ function validatePositioning(repoRoot) {
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
   const codexMarketplace = json(".agents/plugins/marketplace.json");
 
-  check("README positioning and local override guidance", () => {
+  check("README positions yasashii-harness inside the yasashii series", () => {
     includesAll("README.md", readme, [
-      "入力の短さは始めやすさであり、開発規模の上限ではありません。",
+      "やさしいハーネス（yasashii-harness）",
+      "やさしいセクレタリ（yasashii-secretary）",
+      "開発の脳",
+      "補助プラグイン",
+      "「〇〇を作って」",
       "Planner / Generator / Evaluator の3 role",
-      "### 短い新規開発の例",
-      "### 既存repoを継続する例",
+      "/plugin marketplace add mtaiseeei/yasashii-harness",
+      "/plugin install harness@yasashii-harness",
+      "codex plugin marketplace add mtaiseeei/yasashii-harness",
+      "codex plugin add harness@yasashii-harness",
+      "$using-harness",
+      "Claude Code / Codex 両対応",
       "docs/sprints/state.md",
-      "enterprise規模、期間、品質結果を保証するものではありません",
-      ".harness/config.local.toml",
-      "[hosts.codex.roles.generator]",
-      "model = \"inherit\"",
-      "明示したleafだけ",
-      "本チャット",
-      "host既定",
+      "続きから",
     ]);
-    appearsNear("README.md", readme, "ホストが対応する場合は複数Agent", "roleごとの独立作業単位");
+    appearsNear("README.md", readme, "やさしさは、言葉遣い", "緩めません");
   });
 
-  check("README separates Codex routing readiness from verified launch", () => {
+  check("README keeps upstream discipline and defers technical detail upstream", () => {
     includesAll("README.md", readme, [
-      "gpt-5.6-luna",
-      "gpt-5.6-sol",
-      "Model Tier: strong",
-      "Rotate: model-escalation",
-      "dispatch-ready",
-      "launch-verified",
-      "unverified",
-      "3回目の連続失敗",
-      "spec-issue",
-      "Terra",
-      "2026-07-18",
-      "Codex CLI",
-      "Codex App",
-      "Unknown model",
-      "フル経路",
+      "https://github.com/mtaiseeei/agentic-harness",
+      "証跡のない合格は無効",
+      "無人完走することは約束しません",
+      "gentle-overlay/README.md",
     ]);
   });
 

@@ -1,0 +1,7 @@
+# Upstream-baseline files whose content is owned downstream.
+# Sync keeps them present in the tree but does not compose or verify
+# their content. Review upstream changes to these paths manually at
+# each sync (see docs/upstream-mapping.md).
+LICENSE
+README.md
+scripts/check-positioning.mjs

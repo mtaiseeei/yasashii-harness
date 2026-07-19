@@ -2,7 +2,7 @@ docs/upstream-mapping.md
 gentle-overlay/README.md
 gentle-overlay/anchors.tsv
 gentle-overlay/downstream-files.txt
-gentle-overlay/fragments/README.md
+gentle-overlay/downstream-owned.txt
 gentle-overlay/fragments/evaluator.md
 gentle-overlay/fragments/generator.md
 gentle-overlay/fragments/harness-loop.md
