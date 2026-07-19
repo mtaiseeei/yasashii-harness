@@ -113,6 +113,9 @@ Status の語彙は次に限る:
 
 ## 手順
 
+`init`または`check`だけを依頼された場合、このループは開始しない。`scripts/harness.mjs`の該当処理を実行し、
+PlannerやSprintを開始せず結果を報告して停止する。`upgrade`は未実装であり、既存ファイルを変更しない。
+
 ### 0. 準備（docs雛形と整合チェック）
 
 `docs/` が無ければ、次を no-overwrite で作る

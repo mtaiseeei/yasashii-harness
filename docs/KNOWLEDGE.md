@@ -215,6 +215,15 @@ Instead:
 - `/harness` initialization may generate guidance files only when they do not already exist.
 - If custom guidance files exist, harness initialization writes `docs/harness-guidance.md` with a suggested block.
 
+Initialization and development start are separate user intents. Claude Code exposes `/harness init` and `/harness check`;
+Codex routes `$using-harness init`, `$using-harness check`, and equivalent natural-language requests through the same bundled
+`scripts/harness.mjs`. `init` reuses `init-guidance.sh` after a complete destination preflight. `check` is read-only and reports
+safe gaps separately from unsafe path conflicts. Both stop before Planner or Sprint work begins.
+
+This surface intentionally does not infer whether existing files are current. A future `upgrade` needs migration policy for
+repo-owned guidance and configuration, so it remains separate and is not implemented. The bundled command requires no target
+repository package manifest, lockfile, dependency directory, or network access.
+
 ### No Target-Repository Dependency Installation
 
 The core method does not require another plugin. Its TOML parser is fixed and bundled inside this plugin, so target

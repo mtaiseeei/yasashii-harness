@@ -17,6 +17,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
 const resolver = path.join(scriptDir, "resolve-runtime-config.mjs");
 const initializer = path.join(pluginRoot, "scripts/init-guidance.sh");
+const harnessCommand = path.join(pluginRoot, "scripts/harness.mjs");
 const fixtureRoots = new Set();
 
 function fixture() {
@@ -59,6 +60,10 @@ function sha(file) {
 
 function runInitializer(root) {
   return spawnSync(initializer, [root], { encoding: "utf8" });
+}
+
+function runHarnessCommand(args) {
+  return spawnSync(process.execPath, [harnessCommand, ...args], { encoding: "utf8" });
 }
 
 function runCli(args) {
@@ -1612,6 +1617,174 @@ check("initializer creates shared config, preserves custom ignore rules, verifie
   const second = runInitializer(root);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(sha(ignore), digest);
+});
+
+check("harness check is read-only and harness init is idempotent without starting a Sprint", () => {
+  const root = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  fs.writeFileSync(path.join(root, "OWNER.md"), "owner file\n");
+  const before = fs.readdirSync(root).sort();
+
+  const missing = runHarnessCommand(["check", "--root", root]);
+  assert.equal(missing.status, 1, missing.stderr);
+  assert.match(missing.stdout, /Harness check: incomplete/);
+  assert.match(missing.stdout, /missing/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before, "check must not create or update files");
+
+  const initialized = runHarnessCommand(["init", "--root", root]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  assert.match(initialized.stdout, /Agentic Harness guidance initialized/);
+  assert.match(initialized.stdout, /Initialization complete; no Planner or Sprint was started/);
+  assert.equal(fs.readFileSync(path.join(root, "OWNER.md"), "utf8"), "owner file\n");
+  assert.equal(fs.existsSync(path.join(root, "docs/sprints/sprint-001.md")), false);
+
+  const ready = runHarnessCommand(["check", "--root", root]);
+  assert.equal(ready.status, 0, ready.stderr);
+  assert.match(ready.stdout, /Harness check: ready/);
+  assert.match(ready.stdout, /no files were changed/);
+  assert.match(ready.stdout, /^\[present\] AGENTS\.md$/m);
+  assert.match(ready.stdout, /^\[present\] CLAUDE\.md$/m);
+
+  const protectedFiles = [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".harness/config.toml",
+    ".harness/.gitignore",
+    "docs/sprints/state.md",
+  ];
+  const digests = Object.fromEntries(protectedFiles.map((file) => [file, sha(path.join(root, file))]));
+  const second = runHarnessCommand(["init", "--root", root]);
+  assert.equal(second.status, 0, second.stderr);
+  for (const [file, digest] of Object.entries(digests)) {
+    assert.equal(sha(path.join(root, file)), digest, `${file} changed during idempotent init`);
+  }
+});
+
+check("harness check distinguishes preserved custom guidance from present templates", () => {
+  const root = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  fs.writeFileSync(path.join(root, "AGENTS.md"), "# Owner AGENTS\n");
+  fs.writeFileSync(path.join(root, "CLAUDE.md"), "# Owner CLAUDE\n");
+
+  const initialized = runHarnessCommand(["init", "--root", root]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const checked = runHarnessCommand(["check", "--root", root]);
+  assert.equal(checked.status, 0, checked.stderr);
+  assert.match(checked.stdout, /^\[preserved\] AGENTS\.md /m);
+  assert.match(checked.stdout, /^\[preserved\] CLAUDE\.md /m);
+  assert.equal(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), "# Owner AGENTS\n");
+  assert.equal(fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8"), "# Owner CLAUDE\n");
+});
+
+check("harness check reports would-update and legacy warning without writing", () => {
+  const wouldUpdateRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: wouldUpdateRoot });
+  const initialized = runHarnessCommand(["init", "--root", wouldUpdateRoot]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const ignore = path.join(wouldUpdateRoot, ".harness/.gitignore");
+  fs.writeFileSync(ignore, "owner-rule\nconfig.local.toml\n");
+  const ignoreDigest = sha(ignore);
+  const before = fs.readdirSync(wouldUpdateRoot, { recursive: true }).sort();
+
+  const wouldUpdate = runHarnessCommand(["check", "--root", wouldUpdateRoot]);
+  assert.equal(wouldUpdate.status, 1, wouldUpdate.stderr);
+  assert.match(wouldUpdate.stdout, /^\[would-update\].*config\.local\.json$/m);
+  assert.equal(sha(ignore), ignoreDigest);
+  assert.deepEqual(fs.readdirSync(wouldUpdateRoot, { recursive: true }).sort(), before);
+
+  const legacyRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: legacyRoot });
+  fs.mkdirSync(path.join(legacyRoot, ".harness"));
+  const legacy = path.join(legacyRoot, ".harness/config.json");
+  fs.writeFileSync(legacy, '{"lifecycle":"balanced"}\n');
+  const legacyInit = runHarnessCommand(["init", "--root", legacyRoot]);
+  assert.equal(legacyInit.status, 0, legacyInit.stderr);
+  const legacyDigest = sha(legacy);
+  const legacyBefore = fs.readdirSync(legacyRoot, { recursive: true }).sort();
+
+  const legacyCheck = runHarnessCommand(["check", "--root", legacyRoot]);
+  assert.equal(legacyCheck.status, 0, legacyCheck.stderr);
+  assert.match(legacyCheck.stdout, /^\[preserved\] legacy Harness JSON config$/m);
+  assert.match(legacyCheck.stdout, /^\[warning\] legacy JSON config/m);
+  assert.equal(sha(legacy), legacyDigest);
+  assert.deepEqual(fs.readdirSync(legacyRoot, { recursive: true }).sort(), legacyBefore);
+});
+
+check("harness upgrade is intentionally separate and unsupported commands do not touch the target", () => {
+  const root = fixture();
+  const before = fs.readdirSync(root).sort();
+  const upgrade = runHarnessCommand(["upgrade", "--root", root]);
+  assert.equal(upgrade.status, 2);
+  assert.match(upgrade.stderr, /upgrade is not implemented/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before);
+
+  const unknown = runHarnessCommand(["ship", "--root", root]);
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /unknown command/i);
+  assert.deepEqual(fs.readdirSync(root).sort(), before);
+
+  const missingCommand = runHarnessCommand([]);
+  assert.equal(missingCommand.status, 2);
+  assert.match(missingCommand.stderr, /command is required/i);
+});
+
+check("harness init preflights every destination before the legacy initializer can write", () => {
+  const root = fixture();
+  const externalRoot = fixture();
+  const external = path.join(externalRoot, "owner-spec.md");
+  fs.writeFileSync(external, "owner content\n");
+  fs.mkdirSync(path.join(root, "docs"));
+  fs.symlinkSync(external, path.join(root, "docs/spec.md"));
+
+  const before = fs.readdirSync(root, { recursive: true }).sort();
+  const result = runHarnessCommand(["init", "--root", root]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /unsafe/i);
+  assert.deepEqual(fs.readdirSync(root, { recursive: true }).sort(), before);
+  assert.equal(fs.readFileSync(external, "utf8"), "owner content\n");
+  assert.equal(fs.existsSync(path.join(root, ".harness")), false);
+  assert.equal(fs.existsSync(path.join(root, "CLAUDE.md")), false);
+
+  const collisionRoot = fixture();
+  fs.mkdirSync(path.join(collisionRoot, "AGENTS.md"));
+  const collisionBefore = fs.readdirSync(collisionRoot, { recursive: true }).sort();
+  const collision = runHarnessCommand(["init", "--root", collisionRoot]);
+  assert.equal(collision.status, 2);
+  assert.match(collision.stderr, /AGENTS\.md.*regular file/i);
+  assert.deepEqual(fs.readdirSync(collisionRoot, { recursive: true }).sort(), collisionBefore);
+});
+
+check("harness check uses init permission preflight and reports inaccessible paths without a stack", () => {
+  for (const mode of [0o555, 0o000]) {
+    const root = fixture();
+    fs.chmodSync(root, mode);
+    try {
+      for (const command of ["check", "init"]) {
+        const result = runHarnessCommand([command, "--root", root]);
+        assert.equal(result.status, 2, `${command} unexpectedly accepted mode ${mode.toString(8)}`);
+        assert.match(result.stderr, /\[unsafe\]/i);
+        assert.doesNotMatch(result.stderr, /\n\s+at\s+/u, "raw Node stack must not be shown");
+      }
+    } finally {
+      fs.chmodSync(root, 0o700);
+    }
+    assert.deepEqual(fs.readdirSync(root), []);
+  }
+
+  const unreadableRoot = fixture();
+  execFileSync("git", ["init", "-q"], { cwd: unreadableRoot });
+  const initialized = runHarnessCommand(["init", "--root", unreadableRoot]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const ignore = path.join(unreadableRoot, ".harness/.gitignore");
+  fs.chmodSync(ignore, 0o000);
+  try {
+    const checked = runHarnessCommand(["check", "--root", unreadableRoot]);
+    assert.equal(checked.status, 2);
+    assert.match(checked.stderr, /\[unsafe\].*not readable/i);
+    assert.doesNotMatch(checked.stderr, /\n\s+at\s+/u);
+  } finally {
+    fs.chmodSync(ignore, 0o600);
+  }
 });
 
 check("initializer refuses symlink, directory, and unreadable ignore surfaces before other writes", () => {

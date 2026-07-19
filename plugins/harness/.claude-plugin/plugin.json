@@ -1,7 +1,7 @@
 {
   "name": "harness",
   "description": "A file-backed, multi-sprint harness for long-running development, with separate Planner, Generator, and Evaluator roles.",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "author": {
     "name": "taisei"
   },
