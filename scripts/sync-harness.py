@@ -77,6 +77,16 @@ def downstream_files() -> list[str]:
     )
 
 
+def downstream_owned() -> list[str]:
+    file = OVERLAY / "downstream-owned.txt"
+    if not file.exists():
+        return []
+    return sorted(
+        line.strip() for line in file.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+
+
 def parse_anchors() -> dict[str, tuple[str, str]]:
     anchors: dict[str, tuple[str, str]] = {}
     for number, line in enumerate((OVERLAY / "anchors.tsv").read_text(encoding="utf-8").splitlines(), 1):
@@ -174,8 +184,16 @@ def expected_files(base: str) -> dict[str, bytes]:
     for target in set(anchors) | set(metadata["files"]):
         if target not in baseline:
             raise SyncError(f"overlay target is absent from upstream base: {target}")
+    owned = set(downstream_owned())
+    for target in sorted(owned):
+        if target not in baseline:
+            raise SyncError(f"downstream-owned path is absent from upstream base: {target}")
+        if target in anchors or target in metadata["files"]:
+            raise SyncError(f"downstream-owned path conflicts with overlay declarations: {target}")
     expected: dict[str, bytes] = {}
     for path in sorted(baseline):
+        if path in owned:
+            continue
         content = base_bytes(base, path)
         if path in anchors:
             content = compose_overlay(content, *anchors[path], path)

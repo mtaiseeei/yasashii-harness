@@ -113,6 +113,18 @@ composition="$(fresh composition)"
 printf '\nrogue upstream rewrite\n' >> "$composition/plugins/harness/agents/generator.md"
 expect_fail "composition mismatch is rejected" bash "$composition/scripts/sync-harness.sh" --check --offline
 
+owned_edit="$(fresh owned-edit)"
+printf '\ndownstream readme note\n' >> "$owned_edit/README.md"
+expect_ok "downstream-owned README accepts downstream edits" bash "$owned_edit/scripts/sync-harness.sh" --check --offline
+
+owned_outside="$(fresh owned-outside)"
+printf 'NOT_IN_UPSTREAM.md\n' >> "$owned_outside/gentle-overlay/downstream-owned.txt"
+expect_fail "downstream-owned path outside upstream base is rejected" bash "$owned_outside/scripts/sync-harness.sh" --check --offline
+
+owned_missing="$(fresh owned-missing)"
+rm "$owned_missing/README.md"
+expect_fail "deleted downstream-owned file is rejected" bash "$owned_missing/scripts/sync-harness.sh" --check --offline
+
 unclassified="$(fresh unclassified)"
 printf 'unclassified\n' > "$unclassified/UNCLASSIFIED.txt"
 expect_fail "unclassified new file is rejected" bash "$unclassified/scripts/sync-harness.sh" --check --offline
