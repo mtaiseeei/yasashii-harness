@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "短い指示を入口に、3 role・ファイル正本・Sprint・独立評価で大きな開発を継続するハーネス駆動開発プラグイン。",
-    "version": "0.4.3"
+    "version": "0.4.4"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
       "description": "File-backed, multi-sprint harness for long-running development with separate Planner, Generator, and Evaluator roles.",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "author": {
         "name": "taisei"
       },
