@@ -129,11 +129,15 @@ fresh Subagentの起動引数へ渡し、host側metadataで実値を確認でき
 | Codex App | 部分対応 | freshなSol/highとTerra/xhighは一致。Luna指定は`Unknown model`で拒否 |
 | Claude Code | host設定を継承 | 既定は全role `inherit`。ユーザーがhostで有効な正式値を明示した場合だけ適用 |
 
-AppとCLIの差は `.harness/config.toml` の項目を増やして固定せず、Harness開始時に観測したcapabilityの
-利用可能model一覧と適用経路で解決します。将来Codex Appの一覧へLunaが追加された場合、同じGenerator設定が
-native Luna/xhighへ解決されます。現在のAppではLunaが利用不能なので、通常Generatorは既定規則どおり
-Sol/highへfallbackします。Terraはユーザーが明示指定した場合には利用できますが、Harnessの通常経路・昇格・
-利用不能fallbackでは自動選択しません。
+AppとCLIの差をCodex自身に判定させません。Harnessは現在のnative dispatch面がmodel / effort引数を
+受け付けるかを観測します。利用可能値一覧も取得できれば通常どおり事前解決し、引数はあるものの一覧が
+取得できない場合はresolverが`dispatch-attempt`を返します。その場合はダミーAgentではなく、設定値を付けた
+実際のroleを起動します。将来Codex AppでLunaが利用可能になってもconfig変更は不要です。
+
+`dispatch-attempt`が`Unknown model`などの同期的な入力検証で子Agent作成前に拒否された場合だけ、正確な拒否値を
+resolverへ返して再解決します。通常GeneratorのLunaが拒否されるとfreshなSol/highへfallbackし、Solも拒否されると
+`inherit`へ戻ります。高リスクSprint、2回目の連続失敗、証拠付きEvaluator推薦では最初からSol/highを選ぶため、
+Lunaを試しません。Terraと`codex exec`は自動fallbackに使いません。
 
 Codex Appで完了済みAgentへfollow-upした検証では、指定値がSol/lowへ変わったため、model / effortを保つresumeは
 未対応として扱います。CLIを含め、resume後も同じroutingがhost metadataで確認できるまでは、指定値が必要な
@@ -186,7 +190,12 @@ node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" 
 node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" --host codex --event sprint-change
 node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" --host codex --event retry \
   --retry-count 2 --failure-kind implementation-issue --current-model-tier standard
+node /path/to/harness-plugin/scripts/resolve-runtime-config.mjs --root "$(pwd)" --host codex --event initial \
+  --current-model-tier standard --launch-rejected-model gpt-5.6-luna
 ```
+
+`--launch-rejected-model` / `--launch-rejected-effort`は、同じhostが子Agent作成前に値を明示拒否した場合だけ使います。
+繰り返し指定でき、App / CLIの名称判定ではなく、その実行面で観測した拒否値を今回の解決へ渡します。
 
 `--current-model-tier`にはstate.mdの現在値を渡します。resolverが返すdesired tierと異なるときはfresh化します。
 同じtierを継続する場合も、現在の実行面がmodel / effortを保つresumeをhost metadataで確認できた時だけ同じ
@@ -211,6 +220,8 @@ capabilityファイルはオーケストレーターがHarness開始時または
 resolverの`dispatch-ready`は、設定値とhostの受け渡し面を確認できたという意味です。実際にそのmodel / effortで
 Subagentが起動した証明ではありません。`launch-verified`はhost側のsession metadata、trace、dispatch記録で
 model / effortを確認できた場合だけ使います。host側証拠を取得できなければ、実起動は`unverified`と報告します。
+`dispatch-attempt`は受け渡し面だけ確認でき、値の利用可否を実role起動で確かめる状態です。これも実起動の証明では
+ありません。実装失敗、子Agentのcrash、timeout、通信エラーは起動拒否として扱わず、自動で別modelを重複起動しません。
 
 ## 構成要素
 
