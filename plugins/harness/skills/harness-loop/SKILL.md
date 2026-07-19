@@ -191,10 +191,23 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - capabilityの準備・更新・受け渡しはオーケストレーターの責務。Harness開始時とhost状態変更時に、
   実際のhost control、ユーザーが明示したAgent定義、保守された既定から観測できた項目だけをJSONファイルへ書く。
   未確認項目は `null` または省略とし、model知識から `true` を推定しない。
-- CodexがAppかCLIかを自己判定・推定する必要はない。現在のnative dispatch面がrole別model / effort引数を
-  受け付けるかだけをcapabilityへ記録する。引数の適用経路は確認できるが利用可能値一覧が列挙されない場合、
-  resolverは設定値を`dispatch-attempt`として返す。これは「実際のrole起動で試してよい」という意味であり、
-  起動成功や適用済みを表さない。
+- CodexがAppかCLIかを自己判定・推定する必要はない。現在のnative dispatch面と実際のruntime parserが
+  role別model / effort引数を受け付けるかをcapabilityへ記録する。Codex CLIでは、公開schemaに`model`、
+  `reasoning_effort`、`agent_type`が表示されなくてもruntime parserが受理する実装差を確認済みである。
+  **公開schemaに欄が無いことだけを理由に`inherit`へ戻してはならない。** native `spawn_agent`があり、
+  resolverが明示値を返した場合は、正確な`model` / `reasoning_effort`を付けて実roleを1回だけ
+  `dispatch-attempt`する。custom agentを選ぶときの入力名は`agent_type`であり、`agent_role`は渡さない。
+  `agent_role`は起動後のchild metadataで確認する値である。
+- この契約は既定のLuna / Solだけに限定しない。共有config、個人config、またはユーザーが明示した任意の
+  正式なmodel / effortについて、resolverの`effective`値を推測・別名変換せずそのままdispatchする。
+  起動後はchildのhost metadataで指定値との一致を確認し、一致した場合だけ`launch-verified`とする。
+- `model`または`reasoning_effort`自体が`unknown field`として子作成前に拒否された場合は、model値の
+  launch rejectionではなくapplication path不在である。同じ呼び出しを再試行せず、capabilityの対応する
+  `applicationPaths.roleModel` / `roleEffort`を未確認へ戻してresolverを再実行する。model名が
+  `Unknown model`として拒否された場合だけ、後述のlaunch rejection経路を使う。
+- 引数の適用経路は確認できるが利用可能値一覧が列挙されない場合、resolverは設定値を
+  `dispatch-attempt`として返す。これは「実際のrole起動で試す」という意味であり、起動成功や適用済みを
+  表さない。
 - capabilityの`resume: true`は、単にfollow-upを送信できるという意味ではない。resume後もdispatch時の
   model / effortを保持することをhost metadataまたはtraceで確認済み、という意味に限る。
 - capabilityはJSON literalではなく `--capabilities <file>` で渡す。ファイルにはhost別の値一覧に加え、
@@ -240,13 +253,15 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   plugin同梱Agentのfrontmatterを自動書換えず、既定 `roleEffort` は未確認とする。
 - Codexでは、利用repoのcustom agentまたは現在のspawn面がrole別指定を受け付ける場合だけ適用する。
   Codex plugin manifestはAgent定義を配布しないため、設定があるだけでcustom agentが作られたとは扱わない。
+  custom agentが無くても、built-in/default childへ`model` / `reasoning_effort`を直接渡せる場合はその経路を使う。
 - 既存の `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.codex/agents/`、既存設定は一切上書きしない。
 - Codexの通常GeneratorはLuna/xhigh。Lunaが利用不能ならstrongのSol/highを試し、Solも利用不能なら
   model / effortを`inherit`へ戻してwarningを出す。Terraは通常・昇格・availability fallbackの候補にしない。
-- **2026-07-18の実起動基準**: Codex CLIではSol/highの親からnative `spawn_agent`へ
+- **2026-07-20の実起動基準**: Codex CLIではSol/highの親からnative `spawn_agent`へ
   `fork_turns: "none"`、`model: "gpt-5.6-luna"`、`reasoning_effort: "xhigh"`を渡し、子metadataでも
-  Luna/xhighを確認済み。このrole別routingのフル経路はCLIで利用する。Codex AppはfreshなSol/highと
-  Terra/xhighを確認済みだが、Lunaは`Unknown model`で拒否されたため現在は部分対応として扱う。
+  Luna/xhighを確認済み。CLI `0.144.6`では公開schemaに両引数が無くてもruntime parserが受理した。
+  このrole別routingのフル経路はCLIで利用する。Codex AppはfreshなSol/highとTerra/xhighを確認済みだが、
+  2026-07-20の再確認でもLunaは`Unknown model`で拒否されたため現在は部分対応として扱う。
 - 上記は固定の製品判定ではない。Harness開始時とhost更新後に現在のspawn面・利用可能model一覧・
   application pathを再観測する。AppでLunaが観測できたら同じconfigをnative Lunaへ適用し、コードや
   導入repoのconfigを書き換えない。ユーザー明示のTerraは利用可能なら適用できるが、自動経路には入れない。

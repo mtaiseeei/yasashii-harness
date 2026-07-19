@@ -128,11 +128,16 @@ function validatePositioning(repoRoot) {
       "3回目の連続失敗",
       "spec-issue",
       "Terra",
-      "2026-07-18",
+      "2026-07-20",
       "Codex CLI",
       "Codex App",
       "Unknown model",
       "フル経路",
+      "公開schema",
+      "runtime parser",
+      "agent_type",
+      "agent_role",
+      "任意の正式なmodel / effort",
     ]);
   });
 
@@ -239,7 +244,7 @@ function validatePositioning(repoRoot) {
       "full role-model routing",
     ]);
     includesAll("plugins/harness/skills/harness-loop/SKILL.md", loop, [
-      "2026-07-18",
+      "2026-07-20",
       "Codex CLI",
       "Codex App",
       'fork_turns: "none"',

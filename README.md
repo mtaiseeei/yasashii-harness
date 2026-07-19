@@ -143,7 +143,7 @@ Codexのrole既定は次のとおりです。
 | Generator（strong） | `gpt-5.6-sol` | `high` |
 | Evaluator | `gpt-5.6-sol` | `high` |
 
-### Codex実行面の確認状況（2026-07-18）
+### Codex実行面の確認状況（2026-07-20）
 
 ここでいう「フル経路」は、Planner / Generator / Evaluatorそれぞれについて、希望model / effortをnativeな
 fresh Subagentの起動引数へ渡し、host側metadataで実値を確認できる経路を指します。Codex全機能の優劣を
@@ -151,14 +151,21 @@ fresh Subagentの起動引数へ渡し、host側metadataで実値を確認でき
 
 | 実行面 | このrouting機能の状況 | host側で確認できたこと |
 |---|---|---|
-| Codex CLI | フル経路を確認済み | Sol/highのCLI親Agentからnative `spawn_agent`でfreshなLuna/xhighを起動し、子session metadataでも一致 |
-| Codex App | 部分対応 | freshなSol/highとTerra/xhighは一致。Luna指定は`Unknown model`で拒否 |
+| Codex CLI | フル経路を確認済み | CLI 0.144.6では公開schemaに欄が無くても`model` / `reasoning_effort`をruntime parserが受理し、freshなLuna/xhighの子session metadataと一致 |
+| Codex App | 部分対応 | freshなSol/highとTerra/xhighは一致。2026-07-20の再確認でもLuna指定は`Unknown model`で拒否 |
 | Claude Code | host設定を継承 | 既定は全role `inherit`。ユーザーがhostで有効な正式値を明示した場合だけ適用 |
 
 AppとCLIの差をCodex自身に判定させません。Harnessは現在のnative dispatch面がmodel / effort引数を
 受け付けるかを観測します。利用可能値一覧も取得できれば通常どおり事前解決し、引数はあるものの一覧が
 取得できない場合はresolverが`dispatch-attempt`を返します。その場合はダミーAgentではなく、設定値を付けた
 実際のroleを起動します。将来Codex AppでLunaが利用可能になってもconfig変更は不要です。
+
+Codex CLIでは、公開された`spawn_agent` schemaに`model`、`reasoning_effort`、`agent_type`が表示されなくても、
+runtime parserが受理する場合があります。表示に欄が無いことだけで`inherit`へ戻さず、resolverの正確な値を
+実roleへ1回だけ渡して成否を確認します。custom agentの入力名は`agent_type`であり、`agent_role`は渡しません。
+`agent_role`はchild metadata側の確認値です。
+これはLuna / Solだけの特例ではありません。共有config、個人config、ユーザー指定を含め、resolverが選んだ
+任意の正式なmodel / effortを名前変更せずdispatchし、child metadataと一致した場合だけ`launch-verified`にします。
 
 `dispatch-attempt`が`Unknown model`などの同期的な入力検証で子Agent作成前に拒否された場合だけ、正確な拒否値を
 resolverへ返して再解決します。通常GeneratorのLunaが拒否されるとfreshなSol/highへfallbackし、Solも拒否されると

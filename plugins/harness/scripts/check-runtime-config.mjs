@@ -168,15 +168,24 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.match(source, /parent main session/i);
   assert.match(source, /current chat/i);
   assert.match(source, /never fuzzy-matched/i);
-  assert.match(source, /lifecycle = "balanced" reuses/i);
-  assert.match(source, /retry inside the same Sprint resumes/i);
+  assert.match(source, /Allowed values: "balanced" or "fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
+  assert.match(source, /設定可能値は"balanced"または"fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
+  assert.match(source, /"balanced" reuses a role only when model\/effort-preserving resume is verified/i);
+  assert.match(source, /"fresh" starts[\s\S]{0,120}new Generator and Evaluator work units/i);
+  assert.match(source, /Allowed: "inherit" or an exact Codex model ID[\s\S]{0,180}model = "gpt-5\.6-sol"/i);
+  assert.match(source, /Allowed: "inherit" or an exact Codex effort[\s\S]{0,180}effort = "high"/i);
+  assert.match(source, /Allowed: an integer of 1 or greater[\s\S]{0,180}after_failures = 2/i);
+  assert.match(source, /Allowed: true or false[\s\S]{0,180}on_evaluator_recommendation = true/i);
   assert.match(source, /(?:Orchestrator|オーケストレーター).*(?:cannot|does not|not|変更できない).*model/i);
   assert.match(source, /Luna.*Sol.*inherit/is);
   assert.match(source, /Terra.*(?:never|not|do not|自動選択しない)/i);
   assert.match(source, /# EN:.*lifecycle/is);
   assert.match(source, /# JA:.*lifecycle/is);
   assert.match(source, /# EN:.*Codex CLI.*full role.*routing/is);
-  assert.match(source, /# JA:.*2026-07-18.*Codex CLI.*role別/is);
+  assert.match(source, /# JA:.*2026-07-20.*Codex CLI.*role別/is);
+  assert.match(source, /displayed.*schema.*omit.*runtime parser.*accept/is);
+  assert.match(source, /agent_type.*never agent_role/is);
+  assert.match(source, /every exact model\/effort.*not only.*Luna\/Sol/is);
   assert.match(source, /# EN:.*Planner/is);
   assert.match(source, /# JA:.*Planner/is);
   assert.match(source, /# EN:.*Generator/is);
@@ -212,6 +221,19 @@ check("shared TOML is parseable and self-documents lifecycle, inheritance, fallb
   assert.equal(resolved.hosts.codex.roles.planner.model.requested, "gpt-5.6-sol");
   assert.equal(resolved.hosts.codex.roles.generator.model.requested, "gpt-5.6-luna");
   assert.equal(resolved.hosts.codex.roles.evaluator.model.requested, "gpt-5.6-sol");
+});
+
+check("generated guidance preserves hidden-schema exact dispatch rules", () => {
+  for (const relative of ["templates/AGENTS.md", "templates/CLAUDE.md"]) {
+    const source = fs.readFileSync(path.join(pluginRoot, relative), "utf8");
+    assert.match(source, /displayed spawn schema.*runtime parser accepts/is);
+    assert.match(source, /schema omission alone must not force `inherit`/i);
+    assert.match(source, /resolver's exact `dispatch-attempt` values/i);
+    assert.match(source, /`agent_type`, never `agent_role`/i);
+    assert.match(source, /every exact model\/effort.*not only Luna\/Sol/is);
+    assert.match(source, /`unknown field` rejection.*application path is unavailable/is);
+    assert.match(source, /child host metadata matches the dispatched values/is);
+  }
 });
 
 check("recorded Codex CLI and App capability snapshots resolve without claiming launch verification", () => {
@@ -295,6 +317,43 @@ check("Codex probes the configured role values when spawn arguments exist but Ap
   assert.equal(result.hosts.codex.roles.evaluator.model.status, "dispatch-attempt");
   assert.equal(result.hosts.codex.roles.evaluator.effort.effective, "high");
   assert.equal(result.verification.launchVerified, false);
+});
+
+check("Codex dispatch-attempt preserves arbitrary configured model and effort values exactly", () => {
+  const root = fixture();
+  writeToml(path.join(root, ".harness/config.toml"), {
+    version: 1,
+    lifecycle: "fresh",
+    hosts: {
+      codex: {
+        roles: {
+          planner: { model: "codex-team-model", effort: "medium" },
+          generator: { model: "codex-personal-model", effort: "high" },
+          evaluator: { model: "codex-team-model", effort: "xhigh" },
+        },
+      },
+    },
+  });
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+  });
+  const roles = result.hosts.codex.roles;
+  assert.deepEqual(
+    [roles.planner.model.effective, roles.generator.model.effective, roles.evaluator.model.effective],
+    ["codex-team-model", "codex-personal-model", "codex-team-model"],
+  );
+  assert.deepEqual(
+    [roles.planner.effort.effective, roles.generator.effort.effective, roles.evaluator.effort.effective],
+    ["medium", "high", "xhigh"],
+  );
+  for (const role of [roles.planner, roles.generator, roles.evaluator]) {
+    assert.equal(role.model.status, "dispatch-attempt");
+    assert.equal(role.effort.status, "dispatch-attempt");
+  }
 });
 
 check("pre-launch rejection handling applies to every Codex role without changing the Generator tier rules", () => {
@@ -930,6 +989,11 @@ check("orchestration contract records model tier before fresh dispatch and keeps
   assert.match(loop, /Retry Count.*3[\s\S]{0,300}(?:ユーザー|user)/i);
   assert.match(loop, /spec-issue[\s\S]{0,300}Planner/i);
   assert.match(loop, /App.*CLI.*(?:判定|推定).*(?:しない|不要)/is);
+  assert.match(loop, /公開schema.*(?:表示されなくても|欄が無い).*runtime parser/is);
+  assert.match(loop, /公開schema.*(?:欄が無い|表示されなくても)[\s\S]{0,500}dispatch-attempt/is);
+  assert.match(loop, /agent_type[\s\S]{0,200}agent_role.*(?:渡さない|入力)/is);
+  assert.match(loop, /Luna \/ Sol.*限定しない[\s\S]{0,300}effective.*(?:そのまま|推測)/is);
+  assert.match(loop, /unknown field[\s\S]{0,500}applicationPaths\.roleModel/is);
   assert.match(loop, /dispatch-attempt[\s\S]{0,500}(?:実際|実role)[\s\S]{0,500}(?:起動|dispatch)/i);
   assert.match(loop, /(?:Unknown model|起動前)[\s\S]{0,500}--launch-rejected-model[\s\S]{0,500}resolver/is);
   assert.match(loop, /実装失敗[\s\S]{0,500}launch rejection.*(?:扱わない|渡さない)/is);
