@@ -134,6 +134,23 @@ function codexAppCapabilities() {
   };
 }
 
+function codexUnknownAvailabilityCapabilities() {
+  return {
+    codex: {
+      subagents: true,
+      resume: null,
+      roleModel: true,
+      roleEffort: true,
+      models: null,
+      efforts: null,
+      applicationPaths: {
+        roleModel: "Codex native spawn_agent model argument",
+        roleEffort: "Codex native spawn_agent reasoning_effort argument",
+      },
+    },
+  };
+}
+
 const checks = [];
 function check(name, run) {
   checks.push({ name, run });
@@ -243,6 +260,118 @@ check("recorded Codex CLI and App capability snapshots resolve without claiming 
   assert.equal(futureApp.hosts.codex.roles.generator.routing.modelTier, "standard");
   assert.notEqual(futureApp.hosts.codex.roles.generator.model.effective, "gpt-5.6-terra");
   assert.equal(futureApp.verification.launchVerified, false);
+});
+
+check("Codex probes the configured role values when spawn arguments exist but App versus CLI availability is unknown", () => {
+  const root = fixture();
+  fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
+  fs.copyFileSync(
+    path.join(pluginRoot, "templates/.harness/config.toml"),
+    path.join(root, ".harness/config.toml"),
+  );
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "standard");
+  assert.equal(generator.model.effective, "gpt-5.6-luna");
+  assert.equal(generator.model.status, "dispatch-attempt");
+  assert.equal(generator.effort.effective, "xhigh");
+  assert.equal(generator.effort.status, "dispatch-attempt");
+  assert.equal(generator.lifecycle.action, "fresh");
+  assert.equal(result.hosts.codex.roles.planner.model.effective, "gpt-5.6-sol");
+  assert.equal(result.hosts.codex.roles.planner.model.status, "dispatch-attempt");
+  assert.equal(result.hosts.codex.roles.planner.effort.effective, "high");
+  assert.equal(result.hosts.codex.roles.evaluator.model.effective, "gpt-5.6-sol");
+  assert.equal(result.hosts.codex.roles.evaluator.model.status, "dispatch-attempt");
+  assert.equal(result.hosts.codex.roles.evaluator.effort.effective, "high");
+  assert.equal(result.verification.launchVerified, false);
+});
+
+check("pre-launch rejection handling applies to every Codex role without changing the Generator tier rules", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-sol"],
+    launchRejectedEfforts: ["high"],
+  });
+  assert.equal(result.hosts.codex.roles.planner.model.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.planner.effort.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.evaluator.model.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.evaluator.effort.effective, "inherit");
+  assert.equal(result.hosts.codex.roles.generator.routing.modelTier, "standard");
+  assert.equal(result.hosts.codex.roles.generator.model.effective, "gpt-5.6-luna");
+  assert.equal(result.hosts.codex.roles.generator.effort.effective, "xhigh");
+  assert.equal(result.launchRejections.host, "codex");
+  assert.deepEqual(result.launchRejections.models, ["gpt-5.6-sol"]);
+  assert.deepEqual(result.launchRejections.efforts, ["high"]);
+});
+
+check("a pre-launch Luna rejection reroutes the actual Generator to fresh Sol without trying Terra", () => {
+  const root = fixture();
+  fs.mkdirSync(path.join(root, ".harness"), { recursive: true });
+  fs.copyFileSync(
+    path.join(pluginRoot, "templates/.harness/config.toml"),
+    path.join(root, ".harness/config.toml"),
+  );
+
+  const result = resolveRuntimeConfig({
+    root,
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.routing.reason, "standard-model-launch-rejected");
+  assert.equal(generator.routing.rotateReason, "model-availability");
+  assert.equal(generator.model.effective, "gpt-5.6-sol");
+  assert.equal(generator.model.status, "dispatch-attempt");
+  assert.equal(generator.effort.effective, "high");
+  assert.equal(generator.lifecycle.action, "fresh");
+  assert.notEqual(generator.model.effective, "gpt-5.6-terra");
+  assert.ok(result.warnings.some((item) => item.code === "launch-rejected-value"));
+});
+
+check("high-risk routing starts with Sol even when Luna was rejected on the active Codex surface", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    sprintRisk: "high",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.routing.reason, "high-risk-sprint");
+  assert.equal(generator.model.effective, "gpt-5.6-sol");
+  assert.equal(generator.effort.effective, "high");
+});
+
+check("if both configured Codex Generator models are rejected before launch, routing inherits and never selects Terra", () => {
+  const result = resolveRuntimeConfig({
+    root: fixture(),
+    host: "codex",
+    currentModelTier: "standard",
+    capabilityOverrides: codexUnknownAvailabilityCapabilities(),
+    launchRejectedModels: ["gpt-5.6-luna", "gpt-5.6-sol"],
+  });
+  const generator = result.hosts.codex.roles.generator;
+  assert.equal(generator.routing.modelTier, "strong");
+  assert.equal(generator.model.effective, "inherit");
+  assert.equal(generator.effort.effective, "inherit");
+  assert.notEqual(generator.model.effective, "gpt-5.6-terra");
+  assert.ok(result.warnings.some(
+    (item) => item.code === "launch-rejected-value" && /gpt-5\.6-sol/.test(item.reason),
+  ));
 });
 
 check("Codex defaults resolve by role while Claude Code stays inherited", () => {
@@ -795,10 +924,40 @@ check("orchestration contract records model tier before fresh dispatch and keeps
   assert.match(loop, /state\.md[\s\S]{0,500}(?:更新|記録)[\s\S]{0,500}(?:fresh|dispatch)/i);
   assert.match(loop, /Retry Count.*3[\s\S]{0,300}(?:ユーザー|user)/i);
   assert.match(loop, /spec-issue[\s\S]{0,300}Planner/i);
+  assert.match(loop, /App.*CLI.*(?:判定|推定).*(?:しない|不要)/is);
+  assert.match(loop, /dispatch-attempt[\s\S]{0,500}(?:実際|実role)[\s\S]{0,500}(?:起動|dispatch)/i);
+  assert.match(loop, /(?:Unknown model|起動前)[\s\S]{0,500}--launch-rejected-model[\s\S]{0,500}resolver/is);
+  assert.match(loop, /実装失敗[\s\S]{0,500}launch rejection.*(?:扱わない|渡さない)/is);
   assert.match(evaluator, /評価.*自己レビュー|自己レビュー.*評価/);
   assert.match(evaluator, /Escalation Recommendation:\s*strong/i);
   assert.match(evaluator, /証拠|evidence/i);
   assert.match(evaluator, /(?:実装|コード).*(?:しない|修正しない)/);
+});
+
+check("launch rejection CLI input is explicit, repeatable, and requires one selected host", () => {
+  const root = fixture();
+  const capabilities = path.join(root, "capabilities.json");
+  writeJson(capabilities, codexUnknownAvailabilityCapabilities());
+  const rejected = runCli([
+    "--root", root,
+    "--host", "codex",
+    "--capabilities", capabilities,
+    "--current-model-tier", "standard",
+    "--launch-rejected-model", "gpt-5.6-luna",
+    "--json",
+  ]);
+  assert.equal(rejected.status, 0, rejected.stderr);
+  const result = JSON.parse(rejected.stdout);
+  assert.equal(result.hosts.codex.roles.generator.routing.modelTier, "strong");
+  assert.equal(result.hosts.codex.roles.generator.model.effective, "gpt-5.6-sol");
+
+  const ambiguous = runCli([
+    "--root", root,
+    "--launch-rejected-model", "gpt-5.6-luna",
+    "--json",
+  ]);
+  assert.notEqual(ambiguous.status, 0);
+  assert.match(ambiguous.stderr, /--host/);
 });
 
 check("no config uses balanced plus inherit without overstating Claude effort", () => {

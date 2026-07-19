@@ -35,7 +35,12 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - Read shared runtime settings from `.harness/config.toml` and optional personal leaf overrides from the git-ignored
   `.harness/config.local.toml`. Default to `balanced`; Claude Code inherits model/effort, while Codex uses the role defaults
   written in the shared config only when a confirmed dispatch surface can accept them. Treat resolver output as
-  dispatch-ready, not launch-verified, until host metadata proves the actual model and effort.
+  dispatch-ready or dispatch-attempt, not launch-verified, until host metadata proves the actual model and effort.
+- Do not ask Codex to identify App versus CLI. When the current native dispatch surface exposes model/effort arguments but
+  not an available-value list, dispatch the actual role with the resolver's `dispatch-attempt` values. If and only if the
+  host rejects a value before child creation, rerun the same-host resolver with `--launch-rejected-model` or
+  `--launch-rejected-effort`. Never classify implementation failure as launch rejection, and never auto-fallback to Terra
+  or `codex exec`.
 - For Codex, use the strong Generator tier for a high-risk Sprint, the second consecutive implementation failure, or an
   evidence-verified Evaluator recommendation. Compare it with the last dispatched tier retained in state; record the new
   `Model Tier` and `Rotate: model-escalation` before fresh dispatch when the desired tier differs.

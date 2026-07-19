@@ -188,6 +188,10 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - capabilityの準備・更新・受け渡しはオーケストレーターの責務。Harness開始時とhost状態変更時に、
   実際のhost control、ユーザーが明示したAgent定義、保守された既定から観測できた項目だけをJSONファイルへ書く。
   未確認項目は `null` または省略とし、model知識から `true` を推定しない。
+- CodexがAppかCLIかを自己判定・推定する必要はない。現在のnative dispatch面がrole別model / effort引数を
+  受け付けるかだけをcapabilityへ記録する。引数の適用経路は確認できるが利用可能値一覧が列挙されない場合、
+  resolverは設定値を`dispatch-attempt`として返す。これは「実際のrole起動で試してよい」という意味であり、
+  起動成功や適用済みを表さない。
 - capabilityの`resume: true`は、単にfollow-upを送信できるという意味ではない。resume後もdispatch時の
   model / effortを保持することをhost metadataまたはtraceで確認済み、という意味に限る。
 - capabilityはJSON literalではなく `--capabilities <file>` で渡す。ファイルにはhost別の値一覧に加え、
@@ -212,9 +216,20 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 
 - model / effortは前後空白だけを除去し、共有config内の公式referenceで正確なID / aliasを確認する。
   大文字小文字、世代名、provider名などから別modelへ推定変換しない。
-- 実効設定とwarningをdispatch前に確認する。`dispatch-ready` はhostへ渡す面と利用可能値を確認した状態であり、
-  実際にそのmodel / effortで起動した証明ではない。`launch-verified` はhost側session metadataまたはtraceを
-  取得できた場合だけ使う。metadataが無ければ実起動は`unverified`と記録する。
+- 実効設定とwarningをdispatch前に確認する。`dispatch-ready` はhostへ渡す面と利用可能値を確認した状態、
+  `dispatch-attempt`は渡す面だけ確認でき、利用可能値を実roleのdispatchで確かめる状態である。どちらも実際に
+  そのmodel / effortで起動した証明ではない。ダミーAgentではなく、resolverが選んだPlanner / Generator /
+  Evaluatorそのものを設定値付きで起動する。`launch-verified` はhost側session metadataまたはtraceを取得できた
+  場合だけ使い、metadataが無ければ実起動は`unverified`と記録する。
+- `dispatch-attempt`が`Unknown model`、無効なeffortなどの同期的な入力検証で、子Agent作成前に拒否された場合だけ、
+  拒否された正確な値を`--launch-rejected-model`または`--launch-rejected-effort`で同じhostのresolverへ渡して
+  再解決する。Generatorのstandard modelが拒否された場合は`Model Tier: strong`と
+  `Rotate: model-availability`をstate.mdへ記録してからfreshなstrong Generatorをdispatchする。strong modelも
+  拒否された場合は`inherit`へ戻す。Planner / Evaluatorの拒否値も、その項目だけ`inherit`へ戻す。Terraや
+  `codex exec`を自動fallbackに使わない。
+- 実装失敗、テスト不合格、子Agentのcrash、timeout、通信エラーはlaunch rejectionとして扱わず、
+  `--launch-rejected-model` / `--launch-rejected-effort`へ渡さない。子Agentが作成されたか不明なエラーでは、
+  hostのtask一覧またはmetadataで重複が無いと確認するまで自動再dispatchしない。
 - 明示値を適用できない場合はその項目だけ親セッション継承へ戻す。
   warningには問題項目、理由、実効値を含める。設定不備だけを理由にループ全体を停止しない。
 - Claude Codeのrole modelはhostのsubagent model controlを使えるが、role effortは通常のper-dispatch項目ではない。
@@ -312,6 +327,8 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - **1回の dispatch で1スプリントのみ**。
 - 解決済みruntime設定のGenerator用model / effort / lifecycle actionを、ホストが受け付けるdispatch項目にだけ渡す。
   Agentへは設定値を再解釈させず、正本ファイルのpathと対象Sprintだけを渡す。
+- high-risk Sprint、2回目の連続`implementation-issue`、証拠付きEvaluator推薦ではresolverが最初からstrongを
+  選ぶため、Lunaの試行を挟まずSol/highをdispatchする。起動試行はモデル選択後に行い、昇格規則を上書きしない。
 - 完了後、対象の `docs/progress/sprint-*.md` に自己評価と引き渡し事項（起動方法・URL・テストシナリオ・
   回帰チェックの実行コマンド）が書かれていることを確認し、Status を `awaiting-eval` にする。
 - 前スプリントの不合格フィードバックがあれば、Generator はそれを先に直す。

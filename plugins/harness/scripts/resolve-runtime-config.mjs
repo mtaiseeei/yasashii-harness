@@ -502,7 +502,17 @@ function normalizeCapabilities(overrides, warnings, capabilitySource) {
   return { capabilities, sources };
 }
 
-function resolveField({ host, role, field, selected, capabilities, capabilitySources, warnings, configPath: explicitPath }) {
+function resolveField({
+  host,
+  role,
+  field,
+  selected,
+  capabilities,
+  capabilitySources,
+  warnings,
+  launchRejectedValues = [],
+  configPath: explicitPath,
+}) {
   const configPath = explicitPath ?? `hosts.${host}.roles.${role}.${field}`;
   const rawRequested = selected.value;
   const requested = normalizeRuntimeValue(rawRequested);
@@ -516,6 +526,17 @@ function resolveField({ host, role, field, selected, capabilities, capabilitySou
   }
   if (requested === "inherit") {
     return { requested, effective: "inherit", source: selected.source, status: "inherited" };
+  }
+
+  if (launchRejectedValues.includes(requested)) {
+    return {
+      requested,
+      effective: "inherit",
+      source: "fallback",
+      inputSource: selected.source,
+      status: "fallback",
+      rejectionSource: "host-pre-launch",
+    };
   }
 
   const supportedKey = field === "model" ? "roleModel" : "roleEffort";
@@ -539,6 +560,23 @@ function resolveField({ host, role, field, selected, capabilities, capabilitySou
       causeSource: capabilitySources[availableKey],
     }));
     return { requested, effective: "inherit", source: "fallback", inputSource: selected.source, status: "fallback" };
+  }
+
+  if (capabilities[supportedKey] === true && applicationPath && !Array.isArray(available)) {
+    warnings.push(warning("runtime-launch-probe-required", configPath, `${JSON.stringify(requested)} must be tried on the active ${host} dispatch surface because availability is not enumerated`, {
+      effective: requested,
+      source: selected.source,
+      input: requested,
+      causeSource: capabilitySources[availableKey],
+    }));
+    return {
+      requested,
+      effective: requested,
+      source: selected.source,
+      status: "dispatch-attempt",
+      applicationPath,
+      launchVerified: false,
+    };
   }
 
   if (capabilities[supportedKey] !== true || !Array.isArray(available) || !applicationPath) {
@@ -651,16 +689,16 @@ function normalizeRoutingInput({ retryCount, failureKind, evaluatorRecommendatio
   };
 }
 
-function requestedModelAvailable(selected, capabilities) {
+function requestedModelAvailable(selected, capabilities, launchRejectedModels) {
   const value = normalizeRuntimeValue(selected.value);
   return typeof value !== "string"
     || value.length === 0
     || value === "inherit"
-    || !Array.isArray(capabilities.models)
-    || capabilities.models.includes(value);
+    || (!launchRejectedModels.includes(value)
+      && (!Array.isArray(capabilities.models) || capabilities.models.includes(value)));
 }
 
-function generatorTierDecision({ route, escalation, standardModel, capabilities }) {
+function generatorTierDecision({ route, escalation, standardModel, capabilities, launchRejectedModels }) {
   if (route.nextRole !== "generator") return { modelTier: null, reason: "generator-not-routed" };
   if (route.sprintRisk === "high") return { modelTier: "strong", reason: "high-risk-sprint" };
   if (escalation.onEvaluatorRecommendation.value
@@ -672,7 +710,10 @@ function generatorTierDecision({ route, escalation, standardModel, capabilities 
     && route.retryCount >= escalation.afterFailures.value) {
     return { modelTier: "strong", reason: "retry-threshold" };
   }
-  if (!requestedModelAvailable(standardModel, capabilities)) {
+  if (launchRejectedModels.includes(normalizeRuntimeValue(standardModel.value))) {
+    return { modelTier: "strong", reason: "standard-model-launch-rejected" };
+  }
+  if (!requestedModelAvailable(standardModel, capabilities, launchRejectedModels)) {
     return { modelTier: "strong", reason: "standard-model-unavailable" };
   }
   return {
@@ -684,8 +725,19 @@ function generatorTierDecision({ route, escalation, standardModel, capabilities 
 function generatorRotateReason({ route, tier }) {
   if (route.nextRole !== "generator" || tier.modelTier === route.currentModelTier) return null;
   if (route.currentModelTier === "unknown") return "runtime-migration";
-  if (tier.reason === "standard-model-unavailable") return "model-availability";
+  if (["standard-model-unavailable", "standard-model-launch-rejected"].includes(tier.reason)) {
+    return "model-availability";
+  }
   return "model-escalation";
+}
+
+function validateLaunchRejected(values, label) {
+  if (!Array.isArray(values)) throw new Error(`${label} must be an array`);
+  const normalized = values.map((value) => typeof value === "string" ? value.trim() : value);
+  if (normalized.some((value) => typeof value !== "string" || value.length === 0)) {
+    throw new Error(`${label} must contain non-empty strings`);
+  }
+  return [...new Set(normalized)];
 }
 
 function validateRotate(rotate) {
@@ -711,9 +763,42 @@ export function resolveRuntimeConfig({
   evaluatorRecommendation,
   sprintRisk = "standard",
   currentModelTier = "unknown",
+  launchRejectedModels = [],
+  launchRejectedEfforts = [],
 } = {}) {
   const warnings = [...capabilityDiagnostics];
   const normalizedRotate = validateRotate(rotate);
+  const normalizedRejectedModels = validateLaunchRejected(launchRejectedModels, "launchRejectedModels");
+  const normalizedRejectedEfforts = validateLaunchRejected(launchRejectedEfforts, "launchRejectedEfforts");
+  if ((normalizedRejectedModels.length || normalizedRejectedEfforts.length) && selectedHost === "all") {
+    throw new Error("launch rejection inputs require one explicit --host");
+  }
+  for (const model of normalizedRejectedModels) {
+    warnings.push(warning(
+      "launch-rejected-value",
+      `launch.${selectedHost}.models`,
+      `${JSON.stringify(model)} was rejected by the host before the child Agent was created`,
+      {
+        effective: "reroute",
+        source: "host-pre-launch",
+        input: model,
+        causeSource: "host-pre-launch",
+      },
+    ));
+  }
+  for (const effort of normalizedRejectedEfforts) {
+    warnings.push(warning(
+      "launch-rejected-value",
+      `launch.${selectedHost}.efforts`,
+      `${JSON.stringify(effort)} was rejected by the host before the child Agent was created`,
+      {
+        effective: "inherit",
+        source: "host-pre-launch",
+        input: effort,
+        causeSource: "host-pre-launch",
+      },
+    ));
+  }
   const { shared, personal, paths, format } = readConfigFamily(root, warnings);
   const { capabilities, sources: capabilitySources } = normalizeCapabilities(
     capabilityOverrides,
@@ -782,6 +867,7 @@ export function resolveRuntimeConfig({
           escalation,
           standardModel,
           capabilities: capabilities[host],
+          launchRejectedModels: normalizedRejectedModels,
         });
         const strong = tier.modelTier === "strong";
         const modelSelection = strong ? escalation.model : standardModel;
@@ -793,6 +879,7 @@ export function resolveRuntimeConfig({
           capabilities: capabilities[host],
           capabilitySources: capabilitySources[host],
           warnings,
+          launchRejectedValues: normalizedRejectedModels,
           configPath: strong
             ? "hosts.codex.roles.generator.escalation.model"
             : "hosts.codex.roles.generator.model",
@@ -810,6 +897,7 @@ export function resolveRuntimeConfig({
           capabilities: capabilities[host],
           capabilitySources: capabilitySources[host],
           warnings,
+          launchRejectedValues: normalizedRejectedEfforts,
           configPath: strong
             ? "hosts.codex.roles.generator.escalation.effort"
             : "hosts.codex.roles.generator.effort",
@@ -834,6 +922,9 @@ export function resolveRuntimeConfig({
             capabilities: capabilities[host],
             capabilitySources: capabilitySources[host],
             warnings,
+            launchRejectedValues: field === "model"
+              ? normalizedRejectedModels
+              : normalizedRejectedEfforts,
           });
         }
         if (role === "generator") {
@@ -901,6 +992,12 @@ export function resolveRuntimeConfig({
       launchStatus: "unverified",
       launchEvidence: null,
     },
+    launchRejections: {
+      host: normalizedRejectedModels.length || normalizedRejectedEfforts.length ? selectedHost : null,
+      models: normalizedRejectedModels,
+      efforts: normalizedRejectedEfforts,
+      acceptedEvidence: "host refusal before child creation only",
+    },
     hosts: resolvedHosts,
     invariants: {
       separateGeneratorEvaluator: true,
@@ -930,6 +1027,8 @@ function parseArgs(argv) {
     retryCount: 0,
     sprintRisk: "standard",
     currentModelTier: "unknown",
+    launchRejectedModels: [],
+    launchRejectedEfforts: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -951,6 +1050,12 @@ function parseArgs(argv) {
     }
     else if (arg === "--sprint-risk") options.sprintRisk = requireArg(argv, index++, arg);
     else if (arg === "--current-model-tier") options.currentModelTier = requireArg(argv, index++, arg);
+    else if (arg === "--launch-rejected-model") {
+      options.launchRejectedModels.push(requireArg(argv, index++, arg));
+    }
+    else if (arg === "--launch-rejected-effort") {
+      options.launchRejectedEfforts.push(requireArg(argv, index++, arg));
+    }
     else if (arg === "--json") options.json = true;
     else if (arg === "--help") options.help = true;
     else throw new Error(`unknown argument: ${arg}`);
@@ -1018,6 +1123,8 @@ function usage() {
     `  --evaluator-evidence-verified  confirm recommendation evidence was checked\n` +
     `  --sprint-risk RISK      standard or high\n` +
     `  --current-model-tier TIER  unknown, standard, or strong from docs/sprints/state.md\n` +
+    `  --launch-rejected-model MODEL  model refused before child creation; repeatable, requires one --host\n` +
+    `  --launch-rejected-effort EFFORT  effort refused before child creation; repeatable, requires one --host\n` +
     `  --json                  machine-readable output\n`;
 }
 

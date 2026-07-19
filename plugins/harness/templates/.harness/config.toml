@@ -31,11 +31,13 @@
 # JA: 確認済みです（Luna/xhighを含む）。Codex AppはfreshなSol/Terra指定を確認済みですが、Lunaは
 # JA: "Unknown model"で拒否されます。これは現在の観測結果であり、固定的な製品仕様とは扱いません。
 #
-# EN: Values below become dispatch-ready only with an observed role-level application path and an
-# EN: available-value list for the current surface. Resolver output alone is not launch evidence;
-# EN: launch-verified requires host session metadata or a host trace.
-# JA: 以下の値は、現在の実行面でroleへ渡す経路と利用可能値一覧を確認できた場合だけdispatch-readyです。
-# JA: resolver出力だけでは実起動の証拠になりません。launch-verifiedにはhost metadataかtraceが必要です。
+# EN: Do not ask Codex to identify itself as App or CLI. With an observed role-level application path
+# EN: but no enumerated value list, the resolver returns dispatch-attempt and the configured value is
+# EN: tried on the actual role. Only a host refusal before child creation may be fed back to the resolver.
+# EN: Resolver output alone is not launch evidence; launch-verified requires host metadata or a host trace.
+# JA: Codex自身にAppかCLIかを判定させません。roleへ渡す経路は確認できる一方、利用可能値一覧が無い場合、
+# JA: resolverはdispatch-attemptを返し、設定値を実際のrole起動で試します。子Agent作成前のhost拒否だけを
+# JA: resolverへ戻します。resolver出力だけでは実起動の証拠にならず、launch-verifiedにはmetadataかtraceが必要です。
 #
 # EN: If standard Luna is unavailable, Generator tries the configured strong Sol/high pair. If Sol is
 # EN: also unavailable, both leaves inherit with a warning. Terra is never selected automatically for
