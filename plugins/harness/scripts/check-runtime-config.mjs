@@ -161,31 +161,33 @@ function check(name, run) {
   checks.push({ name, run });
 }
 
-check("shared TOML is parseable and self-documents lifecycle, inheritance, fallback, and official references", () => {
+check("shared TOML separates settings from reference and requires exact official values for AI edits", () => {
   const template = path.join(pluginRoot, "templates/.harness/config.toml");
   const source = fs.readFileSync(template, "utf8");
   const config = parseToml(source);
+  const settingsIndex = source.indexOf("# SETTINGS / 設定値");
+  const firstValueIndex = source.indexOf("version = 1");
+  const referenceIndex = source.indexOf("# REFERENCE / 設定方法・動作説明");
+  const evaluatorIndex = source.indexOf("[hosts.codex.roles.evaluator]");
+  const lastValueIndex = source.indexOf('effort = "high"', evaluatorIndex);
+  assert.ok(settingsIndex >= 0 && settingsIndex < firstValueIndex);
+  assert.ok(referenceIndex > lastValueIndex);
+  assert.ok(!source.includes("通常、編集するのはこのセクションだけです。"));
   assert.match(source, /parent main session/i);
   assert.match(source, /current chat/i);
-  assert.match(source, /never fuzzy-matched/i);
-  assert.match(source, /Allowed values: "balanced" or "fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
-  assert.match(source, /設定可能値は"balanced"または"fresh"[\s\S]{0,500}lifecycle = "balanced"/i);
-  assert.match(source, /"balanced" reuses a role only when model\/effort-preserving resume is verified/i);
-  assert.match(source, /"fresh" starts[\s\S]{0,120}new Generator and Evaluator work units/i);
-  assert.match(source, /Allowed: "inherit" or an exact Codex model ID[\s\S]{0,180}model = "gpt-5\.6-sol"/i);
-  assert.match(source, /Allowed: "inherit" or an exact Codex effort[\s\S]{0,180}effort = "high"/i);
-  assert.match(source, /Allowed: an integer of 1 or greater[\s\S]{0,180}after_failures = 2/i);
-  assert.match(source, /Allowed: true or false[\s\S]{0,180}on_evaluator_recommendation = true/i);
+  assert.match(source, /Never guess, fuzzy-match, translate between hosts/i);
+  assert.match(source, /AI editing contract.*consult the[\s\S]{0,120}current official reference/i);
+  assert.match(source, /AI編集規則.*最新公式資料を実際に確認/is);
+  assert.match(source, /exact value cannot be confirmed, preserve the current value/i);
+  assert.match(source, /Allowed values: "balanced" or "fresh"/i);
+  assert.match(source, /"balanced" reuses a role only when host metadata verifies model\/effort-preserving resume/i);
+  assert.match(source, /"fresh" starts new Generator and Evaluator work units/i);
   assert.match(source, /(?:Orchestrator|オーケストレーター).*(?:cannot|does not|not|変更できない).*model/i);
   assert.match(source, /Luna.*Sol.*inherit/is);
-  assert.match(source, /Terra.*(?:never|not|do not|自動選択しない)/i);
-  assert.match(source, /# EN:.*lifecycle/is);
-  assert.match(source, /# JA:.*lifecycle/is);
-  assert.match(source, /# EN:.*Codex CLI.*full role.*routing/is);
-  assert.match(source, /# JA:.*2026-07-20.*Codex CLI.*role別/is);
+  assert.match(source, /Terra.*(?:never|not|do not|自動選択しません)/i);
   assert.match(source, /displayed.*schema.*omit.*runtime parser.*accept/is);
   assert.match(source, /agent_type.*never agent_role/is);
-  assert.match(source, /every exact model\/effort.*not only.*Luna\/Sol/is);
+  assert.match(source, /every exact model\/effort, not only Luna\/Sol/is);
   assert.match(source, /# EN:.*Planner/is);
   assert.match(source, /# JA:.*Planner/is);
   assert.match(source, /# EN:.*Generator/is);
