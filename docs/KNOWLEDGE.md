@@ -282,10 +282,12 @@ resetting Retry Count. Step 2 passes that retained tier to the resolver, compare
 then records Model Tier and Rotate before dispatch. Only terminal completion with no next dispatch resets the state to
 `standard` / `none`; this preserves detection of a strong-to-standard change.
 
-The shared TOML is self-describing through ordinary comments, including lifecycle semantics, parent-main-session
-inheritance, fallback policy, and purpose-labelled official URLs. Comments never enter the resolved data. Model input
-is only trimmed; the resolver never fuzzy-matches or translates an ambiguous name. Confirmed candidates may appear in
-a warning, but are never selected automatically.
+The shared TOML presents the actual settings first and keeps lifecycle, inheritance, fallback, and official references
+in a separate reference section below them. Its AI editing contract requires an agent changing model or effort to consult
+the current official host documentation and copy the exact supported value. If that value cannot be confirmed, the agent
+preserves the current value (or uses `inherit` for a new leaf) and reports that it did not apply a guessed replacement.
+Comments never enter the resolved data. Model input is only trimmed; the resolver never fuzzy-matches or translates an
+ambiguous name. Confirmed candidates may appear in a warning, but are never selected automatically.
 
 Legacy `.harness/config.json` and `.harness/config.local.json` remain read-compatible when no TOML config exists and
 produce a migration warning. If either TOML config exists, TOML is canonical and legacy JSON is diagnosed but never

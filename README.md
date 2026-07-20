@@ -197,8 +197,9 @@ Claude Codeの既定は全roleで`inherit`です。Codex名からClaude Codeのm
 無効・利用不能・host未対応の値は、その項目だけ警告付きで `inherit` へ戻ります。通常GeneratorのLunaが
 利用不能と確認できた場合はSol/highを試し、Solも利用不能ならmodel / effortを`inherit`へ戻します。
 Harness自身はTerraを通常・昇格・利用不能fallbackのどこでも自動選択しません。
-正確なmodel ID / aliasは共有TOMLの用途付き公式URLコメントで確認してください。前後空白以外を
-自動補正せず、曖昧なmodel名を候補へ変換することはありません。
+AIエージェントへmodel / effortの変更を依頼した場合は、共有TOMLに記載した該当hostの公式URLを
+その時点で実際に確認し、正式なmodel ID / alias / effortをそのまま使います。確認できない値は
+推測で書かず、現在値を維持します。前後空白以外を自動補正せず、曖昧なmodel名を候補へ変換しません。
 
 たとえばCodexのGeneratorだけを本チャットのmodelへ戻す最小の個人設定は次です。
 
