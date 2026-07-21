@@ -148,8 +148,9 @@ Status の語彙は次に限る:
 - **Lineage Dispatches budget**: オーケストレーターは Generator / Evaluator の dispatch 前に、
   state.md の `Lineage Dispatches` の現在値が runtime config の `limits.max_lineage_dispatches`
   （既定 10）に達していれば、+1 せず dispatch を止めてユーザーへ状況と選択肢を報告する。
-  未満なら +1 を state.md へ記録してから dispatch する（カウンタは常に実 dispatch 数と一致させる。
-  子 Agent 作成前の同期的な launch rejection は消費せず、再解決後の再 dispatch で +1 し直さない）。
+  未満なら +1 を state.md へ記録してから dispatch する（この +1 は同一の論理 dispatch への予約として扱う。
+  子 Agent 作成前の同期的な launch rejection では予約を fallback へ引き継ぎ、再解決後の再 dispatch で
+  +1 し直さない。最終的に子 Agent を作成しないまま中断する場合だけ予約を取り消して -1 し、実 dispatch 数と一致させる）。
   この値は同一の Base Sprint 系譜（`sprint-NNN` とその patch 群、spec-issue による契約改訂を含む）で
   累積し、spec-issue 分類、patch 採番、fresh ローテーション、Retry Count のリセットでは 0 に戻さない。
   次のメインスプリントへ進むとき、またはユーザーが明示的にリセットを指示したときだけ 0 に戻す。
