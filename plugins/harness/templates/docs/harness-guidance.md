@@ -21,8 +21,18 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
 - Evaluator writes the matching `docs/feedback/sprint-*.md` after operating the real app. A pass requires
   recorded evidence (commands, URL/DOM interactions, screenshots when visual quality is scored).
 - The orchestrator (main agent) is the only writer of `docs/sprints/state.md`, the execution-state source
-  of truth (Current ID, per-sprint status, retry count). Record every pass/fail there before moving on.
+  of truth (Current ID, per-sprint status, retry count, spec-issue count, lineage dispatch budget).
+  Record every pass/fail there before moving on.
   Three consecutive failures on one sprint escalate to the user; spec-issue failures go back to Planner.
+- Failure classes are `implementation-issue` (Generator), `spec-issue` (Planner), and
+  `verification-scope-issue` (straight to the user with options; findings about verification tooling
+  never loop on their own). Evidence listed in the rubric/contract is sufficient for a pass (safe harbor);
+  Evaluator must not invent extra evidence formats, and building evidence-collection infrastructure is
+  never a pass condition.
+- Tightening acceptance criteria, thresholds, or evidence formats for an active sprint requires user
+  approval. At the configured limits (`limits` in `.harness/config.toml`: lineage dispatches, spec-issue
+  returns) the loop stops for user options instead of dispatching again. `done-by-user-decision` records
+  a user-accepted completion with remaining shortfalls preserved.
 - Use zero-padded sprint IDs like `sprint-005.md`; do not create decimal IDs like `sprint-5.10.md`.
 - In a harness-managed repository, classify small follow-ups instead of fixing them outside the loop:
   direct fix (non-behavioral), micro patch (`Type: micro`, lightweight evaluation), or a regular patch

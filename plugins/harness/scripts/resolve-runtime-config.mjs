@@ -12,6 +12,7 @@ const HOSTS = ["claudeCode", "codex"];
 const ROLES = ["planner", "generator", "evaluator"];
 const FIELDS = ["model", "effort"];
 const ESCALATION_FIELDS = ["model", "effort", "after_failures", "on_evaluator_recommendation"];
+const LIMIT_FIELDS = ["max_lineage_dispatches", "max_spec_issue_returns"];
 const CAPABILITY_FLAGS = ["subagents", "resume", "roleModel", "roleEffort"];
 const CAPABILITY_LISTS = ["models", "efforts"];
 const MAX_DIAGNOSTIC_INPUT_LENGTH = 4096;
@@ -20,6 +21,10 @@ const MAX_DIAGNOSTIC_REASON_LENGTH = 1024;
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
   lifecycle: "balanced",
+  limits: Object.freeze({
+    max_lineage_dispatches: 10,
+    max_spec_issue_returns: 2,
+  }),
   hosts: Object.fromEntries(
     HOSTS.map((host) => [
       host,
@@ -223,12 +228,24 @@ function validateConfig(config, label, source, warnings, { legacy = false } = {}
     return true;
   };
 
-  inspectTable(config, label, ["version", "lifecycle", "hosts", ...(legacy ? ["$comment", "references", "policy"] : [])]);
+  inspectTable(config, label, ["version", "lifecycle", "hosts", "limits", ...(legacy ? ["$comment", "references", "policy"] : [])]);
   if (own(config, "version") && config.version !== 1) {
     warnings.push(warning("invalid-config-value", `${label}.version`, "expected integer 1", {
       source,
       input: config.version,
     }));
+  }
+  if (own(config, "limits") && inspectTable(config.limits, `${label}.limits`, LIMIT_FIELDS)) {
+    for (const field of LIMIT_FIELDS) {
+      if (!own(config.limits, field)) continue;
+      const value = config.limits[field];
+      if (!Number.isInteger(value) || value < 1 || value > 99) {
+        warnings.push(warning("invalid-config-value", `${label}.limits.${field}`, "expected an integer from 1 to 99", {
+          source,
+          input: value,
+        }));
+      }
+    }
   }
   if (!own(config, "hosts")) return;
   if (!inspectTable(config.hosts, `${label}.hosts`, HOSTS)) return;
@@ -384,6 +401,38 @@ function chooseEscalationValue(personal, shared, field, warnings) {
 
 function normalizeRuntimeValue(value) {
   return typeof value === "string" ? value.trim() : value;
+}
+
+function explicitLimitValue(config, field) {
+  const limits = config?.limits;
+  return own(limits, field) ? limits[field] : undefined;
+}
+
+function chooseLimitValue(personal, shared, field) {
+  // An invalid value in one layer falls through to the next explicit layer,
+  // so a broken personal override cannot silently widen a stricter shared
+  // limit back to the plugin default. validateConfig already warned about
+  // the invalid input with its source and location.
+  const defaultValue = DEFAULT_CONFIG.limits[field];
+  let discarded = false;
+  for (const candidate of [
+    { value: explicitLimitValue(personal, field), source: "personal" },
+    { value: explicitLimitValue(shared, field), source: "shared" },
+  ]) {
+    if (candidate.value === undefined) continue;
+    if (Number.isInteger(candidate.value) && candidate.value >= 1 && candidate.value <= 99) {
+      return { value: candidate.value, source: candidate.source };
+    }
+    discarded = true;
+  }
+  return { value: defaultValue, source: discarded ? "fallback" : "plugin" };
+}
+
+function resolveLimits(personal, shared) {
+  return {
+    maxLineageDispatches: chooseLimitValue(personal, shared, "max_lineage_dispatches"),
+    maxSpecIssueReturns: chooseLimitValue(personal, shared, "max_spec_issue_returns"),
+  };
 }
 
 function capabilityPayload(overrides) {
@@ -838,6 +887,7 @@ export function resolveRuntimeConfig({
     }));
     lifecycle = { value: "balanced", source: "fallback" };
   }
+  const limits = resolveLimits(personal, shared);
 
   if (!["initial", "sprint-change", "retry"].includes(event)) {
     throw new Error(`invalid --event ${JSON.stringify(event)}; expected initial, sprint-change, or retry`);
@@ -976,6 +1026,7 @@ export function resolveRuntimeConfig({
       },
     },
     lifecycle: { mode: lifecycle.value, source: lifecycle.source, event, rotate: normalizedRotate },
+    limits,
     routing: {
       nextRole: route.nextRole,
       stopReason: route.stopReason,
@@ -1094,6 +1145,7 @@ function readCapabilityFile(file) {
 function printText(result) {
   console.log(`Harness runtime: ${result.lifecycle.mode} (${result.lifecycle.source}), event=${result.lifecycle.event}`);
   console.log(`Routing: next=${result.routing.nextRole}; current-tier=${result.routing.currentModelTier}; stop=${result.routing.stopReason ?? "none"}; launch-verified=false`);
+  console.log(`Limits: lineage-dispatches=${result.limits.maxLineageDispatches.value} (${result.limits.maxLineageDispatches.source}); spec-issue-returns=${result.limits.maxSpecIssueReturns.value} (${result.limits.maxSpecIssueReturns.source})`);
   for (const [host, hostConfig] of Object.entries(result.hosts)) {
     console.log(`\n${host}`);
     for (const [role, roleConfig] of Object.entries(hostConfig.roles)) {

@@ -48,6 +48,16 @@ on_evaluator_recommendation = true
 model = "gpt-5.6-sol"
 effort = "high"
 
+# EN: Loop-stop limits. When a limit is reached, the orchestrator stops and asks the user instead of dispatching again.
+# JA: ループ停止の上限です。到達したらオーケストレーターは追加dispatchせずユーザーへ確認します。
+[limits]
+# EN: Cumulative Generator/Evaluator dispatches per base-sprint lineage (retries, spec-issue returns, and patches included). Integer 1-99.
+# JA: Base Sprint系譜（retry、spec-issue差し戻し、patchを含む）の累積dispatch数の上限です。1〜99の整数。
+max_lineage_dispatches = 10
+# EN: When Spec-Issue Count on one sprint reaches this value, the orchestrator stops the Planner round trip and reports to the user. Integer 1-99.
+# JA: 同一SprintのSpec-Issue Countがこの値に達したら、Plannerとの往復を続けずユーザーへ報告します。1〜99の整数。
+max_spec_issue_returns = 2
+
 
 # ============================================================
 # REFERENCE / 設定方法・動作説明

@@ -91,7 +91,7 @@ Self-evaluation tends to be too positive. Evaluator must be independent and skep
 
 ### Use Thresholds
 
-Each sprint is pass/fail. If one threshold fails, the sprint fails and returns to Generator. Give extra attention to areas models often handle poorly, especially design quality and originality.
+Each sprint is pass/fail. If one threshold fails, the sprint fails and returns to Generator. Give extra attention to areas models often handle poorly, especially design quality and originality. The hard gate applies to criteria that existed in the contract and rubric when the sprint started; criteria added mid-loop stay advisory until the user approves hard-gating them from the next sprint.
 
 ### Verify The Running Product
 
@@ -348,6 +348,78 @@ institutionalized), scoring axes are unified across Generator and Evaluator with
 `docs/spec/rubric.md`, failures are classified `implementation-issue` vs `spec-issue` (spec issues
 return to Planner), three consecutive failures escalate to the user, Generator commits carry sprint-ID
 prefixes, and acceptance tags are opt-in.
+
+### Proportional Verification And Runaway-Verification Guards (v0.5.0)
+
+The second real-world run (a Harness-managed repository shipping a plugin product to four host
+surfaces, Sprint 033) exposed a runaway-verification mode. A completion candidate had already passed
+real conversations on all four hosts, yet the loop kept expanding the completion conditions: expiring
+approval manifests, one-time challenges, digest-pinned collector/driver/attestor chains, a two-layer
+evidence schema, a GUI-only accessibility collector, and exact-result matrices. Eventually the
+Evaluator's High findings were all about the verification infrastructure itself, the sprint diff
+contained zero product code, and repository verification code outgrew the product code — while the
+sprint still could not complete. The user ended it by removing the proof infrastructure from product
+scope while keeping the direct product-behavior and safety evidence.
+
+Root causes traced to the design, not to any single role: the spec-issue path consumed no retry
+budget and re-entered implementation without user review, rubric tightening had no approval gate
+while the single-threshold hard gate instantly weaponized every new criterion, evidence had a floor
+("no evidence, no pass") but no ceiling, Planner's "no implementation details" rule did not cover
+verification-infrastructure design, and failure classification had no vocabulary for "the verification
+demand itself is the problem".
+
+Decisions:
+
+- A third failure class, `verification-scope-issue`, goes directly to the user with options
+  (fix / accept at a lower evidence level / de-scope) and is never auto-routed to Generator or Planner.
+  Every finding carries a target class: `product` or `verification-infra`; `verification-infra`
+  findings alone do not fail a sprint. Ties classify as `product`, and a no-regression score cannot
+  pass while the handed-over regression suite is unrunnable or failing — a suite-caused failure is
+  itself a `verification-scope-issue`, so the classification cannot be used to slip a real regression
+  through.
+- Evidence sufficiency (safe harbor): the evidence formats listed in the rubric and contract are
+  sufficient for a pass. Evaluator must not invent evidence formats, and building evidence-collection
+  infrastructure is never a pass condition. Sufficiency is host-neutral by design: whatever the chosen
+  verification surface naturally produces (command output, interaction records, screenshots, host-owned
+  session records) is acceptable, and a unified cross-surface attestation schema must not be required.
+  The safe harbor can never fall below the evidence floor, defaults to the floor when a rubric lists no
+  evidence formats, and bounds what may be demanded, not what Evaluator may observe — defects observed
+  outside the fixed verification scope stay valid product findings.
+- Tightening an active sprint's acceptance criteria, thresholds, or evidence formats requires user
+  approval — including after a spec-issue return, which now also passes its contract diff through user
+  review before implementation resumes. Criteria added mid-loop hard-gate only from the next sprint.
+  De-scoping and demoting checks to optional internal QA are legitimate recorded moves, and removing a
+  de-scoped check is not "deleting tests to pass".
+- `state.md` gains `Spec-Issue Count` (per-sprint spec-issue returns) and `Lineage Dispatches`
+  (cumulative dispatches per base-sprint lineage that no reclassification, patch numbering, or fresh
+  rotation resets). Their limits live in `.harness/config.toml` under `[limits]`
+  (`max_lineage_dispatches` default 10, `max_spec_issue_returns` default 2) and are resolved by
+  `resolve-runtime-config.mjs`. Reaching a limit stops the loop for user options. Both fields migrate
+  lazily like `Model Tier`.
+- Re-evaluation is incremental: changed surfaces plus the regression suite; recorded evidence carries
+  over for unchanged surfaces and unchanged commits. A user-declared real-host confirmation recorded in
+  `state.md` counts as evidence; Generator self-reports still do not.
+- `done-by-user-decision` is a first-class status: the user accepts a sprint with recorded shortfalls,
+  Evaluator's feedback stays unchanged, and the unmet items remain visible to later sprints.
+- Generator reports verification-only diffs and verification code outgrowing product code; the
+  orchestrator surfaces both to the user.
+- Micro-patch conditions are product-type neutral ("one feature surface and one flow", with a
+  no-screen equivalent) so CLI/plugin products are not forced into full evaluation for every change.
+
+Alternatives rejected:
+
+- Host-specific evidence tiers (a GUI table versus a CLI table) — rejected by the user: the essential
+  loop behavior must not fork per host. Host differences stay confined to the verification-surface
+  priority list; sufficiency is expressed host-neutrally instead.
+- Weakening Evaluator independence or the evidence floor — rejected. The independent skeptical
+  Evaluator caught the original genuine security findings; the fix bounds its demands, not its
+  independence.
+- A hard automatic abort on guard trips — rejected. Guards present options and the user decides,
+  because a tightening demand can be legitimate (the originating security findings were).
+
+`scripts/check-loop-rules.mjs` keeps this vocabulary present in the distributed surfaces; it is a
+deliberately thin string-presence check so the guard against runaway verification does not itself
+become runaway verification.
 
 ### Codex Distribution Limits
 
