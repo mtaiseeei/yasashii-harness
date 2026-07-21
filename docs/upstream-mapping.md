@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `5152476477d5864c9ba93a3be0d44ef53fe735c8` (Agentic Harness v0.4.5 + Config layout)
+- Current synchronized base: `dee1ffad819e33d7b45709850e85bfa77e897a6b` (Agentic Harness v0.4.6)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
