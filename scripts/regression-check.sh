@@ -50,6 +50,7 @@ expect_ok "Claude marketplace metadata is valid" python3 -m json.tool "$ROOT/.cl
 expect_ok "Codex marketplace metadata is valid" python3 -m json.tool "$ROOT/.agents/plugins/marketplace.json"
 expect_ok "metadata allowlist is valid" python3 -m json.tool "$ROOT/gentle-overlay/metadata-overrides.json"
 expect_ok "upstream runtime check remains available" test -f "$ROOT/plugins/harness/scripts/check-runtime-config.mjs"
+expect_ok "loop-rule vocabulary regression" node "$ROOT/scripts/check-loop-rules.mjs"
 expect_ok "upstream templates remain available" test -f "$ROOT/plugins/harness/templates/.harness/config.toml"
 expect_ok "upstream vendor remains available" test -f "$ROOT/plugins/harness/vendor/smol-toml/index.cjs"
 expect_ok "upstream LICENSE remains available" test -f "$ROOT/LICENSE"
