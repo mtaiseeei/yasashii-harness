@@ -1901,6 +1901,60 @@ check("temporary fixtures are cleaned after a failing regression process", () =>
   assert.equal(fs.existsSync(childFixture), false);
 });
 
+check("loop-stop limits resolve with defaults, overrides, and safe fallbacks", () => {
+  const bare = fixture();
+  const defaults = resolveRuntimeConfig({ root: bare });
+  assert.deepEqual(defaults.limits, {
+    maxLineageDispatches: { value: 10, source: "plugin" },
+    maxSpecIssueReturns: { value: 2, source: "plugin" },
+  });
+
+  const template = fs.readFileSync(path.join(pluginRoot, "templates/.harness/config.toml"), "utf8");
+  assert.match(template, /\[limits\]/);
+  assert.match(template, /max_lineage_dispatches = 10/);
+  assert.match(template, /max_spec_issue_returns = 2/);
+  assert.ok(template.indexOf("[limits]") < template.indexOf("# REFERENCE / 設定方法・動作説明"));
+
+  const root = fixture();
+  writeToml(path.join(root, ".harness/config.toml"), {
+    limits: { max_lineage_dispatches: 14, max_spec_issue_returns: 3 },
+  });
+  writeToml(path.join(root, ".harness/config.local.toml"), {
+    limits: { max_spec_issue_returns: 1 },
+  });
+  const result = resolveRuntimeConfig({ root });
+  assert.deepEqual(result.limits.maxLineageDispatches, { value: 14, source: "shared" });
+  assert.deepEqual(result.limits.maxSpecIssueReturns, { value: 1, source: "personal" });
+
+  const invalidRoot = fixture();
+  writeToml(path.join(invalidRoot, ".harness/config.toml"), {
+    limits: { max_lineage_dispatches: 0, unexpected: true },
+  });
+  const invalid = resolveRuntimeConfig({ root: invalidRoot });
+  assert.equal(invalid.limits.maxLineageDispatches.value, 10);
+  assert.equal(invalid.limits.maxLineageDispatches.source, "fallback");
+  assert.equal(invalid.limits.maxSpecIssueReturns.value, 2);
+  assert.ok(invalid.warnings.some((item) => item.code === "invalid-config-value"
+    && item.path.endsWith("limits.max_lineage_dispatches")));
+  assert.ok(invalid.warnings.some((item) => item.code === "unknown-config-key"
+    && item.path.endsWith("limits.unexpected")));
+
+  // An invalid personal override falls through to the stricter shared limit,
+  // never widening it back to the plugin default.
+  const fallthroughRoot = fixture();
+  writeToml(path.join(fallthroughRoot, ".harness/config.toml"), {
+    limits: { max_lineage_dispatches: 3 },
+  });
+  writeToml(path.join(fallthroughRoot, ".harness/config.local.toml"), {
+    limits: { max_lineage_dispatches: "many" },
+  });
+  const fallthrough = resolveRuntimeConfig({ root: fallthroughRoot });
+  assert.deepEqual(fallthrough.limits.maxLineageDispatches, { value: 3, source: "shared" });
+  assert.ok(fallthrough.warnings.some((item) => item.code === "invalid-config-value"
+    && item.source === "personal"
+    && item.path.endsWith("limits.max_lineage_dispatches")));
+});
+
 const completed = [];
 try {
   for (const { name, run } of checks) {
