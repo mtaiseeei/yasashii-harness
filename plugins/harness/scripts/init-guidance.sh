@@ -156,6 +156,8 @@ seed_file "${TARGET_ROOT}/docs/sprints/state.md" '# Sprint State
 
 - Current ID: TBD
 - Retry Count: 0
+- Spec-Issue Count: 0
+- Lineage Dispatches: 0
 - Model Tier: standard
 - Rotate: none
 - Next Planned: TBD

@@ -43,8 +43,9 @@ description: 短い新規アイデア、まとまった機能開発、既存Harn
 - **ハーネス管理下のリポジトリ**：小さく見えてもハーネス外で直すのを既定にしない。
   `docs/sprints/state.md` を読み、必ず次の3つに分類してから着手する。
   1. **直接修正** — typo・コメント・ドキュメント・設定値など、アプリの挙動を変えない変更。ハーネス外で直してよい。
-  2. **micro-patch** — 挙動やUIに触れる軽微な変更で、同一画面・同一導線に閉じ、その導線を守る
-     自動回帰チェックが既に存在するもの。`Type: micro` の Patch Sprint として軽量ループを回す。
+  2. **micro-patch** — 挙動やUIに触れる軽微な変更で、同一の機能面・同一の利用フローに閉じ
+     （画面を持たない製品では同一コマンド・同一機能領域）、その面を守る自動回帰チェックが
+     既に存在するもの。`Type: micro` の Patch Sprint として軽量ループを回す。
   3. **通常の Patch Sprint / 次のメインスプリント** — それ以外。`harness-loop` に従う。
 
 ## どう動くか（3 role）
@@ -55,7 +56,8 @@ description: 短い新規アイデア、まとまった機能開発、既存Harn
 | 実装 | `generator` | 1スプリント＝1機能ずつ実装＋自己評価＋回帰チェックの資産化。範囲外追加は勝手に混ぜず Patch Sprint へ回す | `docs/progress/sprint-*.md` |
 | 検証 | `evaluator` | 利用可能なブラウザ検証面で実際に操作してテスト、rubric の閾値で合否。合格には証跡必須 | `docs/feedback/sprint-*.md` |
 
-進行状態の正本 `docs/sprints/state.md`（Current ID・各スプリントの Status・Retry Count）は、
+進行状態の正本 `docs/sprints/state.md`（Current ID・各スプリントの Status・Retry Count・
+Spec-Issue Count・Lineage Dispatches）は、
 この3 roleではなく **オーケストレーター（メインエージェント）だけ** が書く。
 
 GANの発想で **生成（Generator）と評価（Evaluator）を分離** しているのが肝。自己評価は甘くなる
