@@ -22,31 +22,34 @@ effort = "inherit"
 model = "inherit"
 effort = "inherit"
 
-# EN: Codex Planner handles requirements, acceptance criteria, and rubric design.
-# JA: Codex Plannerは要件、受入条件、rubricを設計します。
+# EN: Codex roles inherit the current host model and effort by default.
+# JA: Codexの各roleも既定で現在のhost model / effortを継承します。
+[hosts.codex.custom_agents]
+# EN: Opt in to the global harness_luna_worker path when a role resolves to exactly gpt-5.6-luna.
+# JA: roleが正確にgpt-5.6-lunaへ解決された場合にglobal harness_luna_worker経路を使う明示スイッチです。
+enabled = false
+
 [hosts.codex.roles.planner]
-model = "gpt-5.6-sol"
-effort = "high"
+model = "inherit"
+effort = "inherit"
 
-# EN: Standard Codex Generator handles normal implementation and the first implementation retry.
-# JA: 通常のCodex Generatorは通常実装と1回目のimplementation retryを担当します。
 [hosts.codex.roles.generator]
-model = "gpt-5.6-luna"
-effort = "xhigh"
+model = "inherit"
+effort = "inherit"
 
-# EN: Strong Generator settings and automatic escalation gates.
-# JA: strong Generatorの設定と自動昇格条件です。
+# EN: Generator escalation keeps the host model and effort unless explicitly overridden.
+# JA: Generator昇格時も、明示的に変更しない限りhost model / effortを継承します。
 [hosts.codex.roles.generator.escalation]
-model = "gpt-5.6-sol"
-effort = "high"
+model = "inherit"
+effort = "inherit"
 after_failures = 2
 on_evaluator_recommendation = true
 
 # EN: Codex Evaluator performs evidence-backed evaluation and self-review; it never implements fixes.
 # JA: Codex Evaluatorは証拠付き評価と自己レビューを行い、実装修正は行いません。
 [hosts.codex.roles.evaluator]
-model = "gpt-5.6-sol"
-effort = "high"
+model = "inherit"
+effort = "inherit"
 
 # EN: Loop-stop limits. When a limit is reached, the orchestrator stops and asks the user instead of dispatching again.
 # JA: ループ停止の上限です。到達したらオーケストレーターは追加dispatchせずユーザーへ確認します。
@@ -88,10 +91,16 @@ max_spec_issue_returns = 2
 # JA: "balanced"はmodel / effortを保つresumeをhost metadataで確認できた場合だけroleを再利用します。
 # JA: "fresh"はSprint境界でGeneratorとEvaluatorを新しくします。両roleは常に分離します。
 
-# EN: If standard Luna is unavailable, Generator tries the configured strong Sol pair. If Sol is also
-# EN: unavailable, both leaves inherit with a warning. Terra is never selected automatically.
-# JA: 通常GeneratorのLunaが利用不能なら設定済みのstrong Solを試し、Solも利用不能なら警告付きで
-# JA: model / effortをinheritへ戻します。Terraは自動選択しません。
+# EN: All distributed Codex role leaves inherit by default. Explicit shared, personal, or user settings
+# EN: still use the standard/strong routing rules. Terra is never selected automatically.
+# JA: 配布時のCodex各roleはすべてinheritです。共有設定、個人設定、またはユーザー指定で明示した値には、
+# JA: 引き続きstandard / strongのrouting規則を適用します。Terraは自動選択しません。
+
+# EN: custom_agents.enabled controls only the application path. When true, an exact Luna role uses
+# EN: harness_luna_worker without a model override, passes only the resolved effort, and always starts fresh.
+# EN: The global definition is never created by the resolver; provisioning requires explicit approval.
+# JA: custom_agents.enabledは起動経路だけを切り替えます。trueかつLunaのroleはmodelを重ねて渡さず、
+# JA: 解決済みeffortだけを渡して毎回freshに起動します。resolverはglobal定義を作成せず、作成には明示承認が必要です。
 
 # EN: A displayed Codex spawn schema may omit model, effort, and agent_type even when the runtime parser
 # EN: accepts them. Try the resolver's exact dispatch-attempt values once on the actual role. Use agent_type,

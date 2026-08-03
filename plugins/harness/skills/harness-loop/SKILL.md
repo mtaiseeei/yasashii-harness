@@ -233,6 +233,9 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 
 - 共有設定は `.harness/config.toml`、個人設定は `.harness/config.local.toml`。優先順位は
   `個人の明示項目 > 共有の明示項目 > plugin既定` で、設定オブジェクト全体を置換しない。
+- Codexのcustom agent経路は`hosts.codex.custom_agents.enabled`でmodel選択とは別に制御し、既定は`false`。
+  共有・個人configのleaf mergeで解決する。`false`ではLuna設定でもcustom agent定義を確認せず、既存の
+  direct dispatchを維持する。端末ごとの差なので、通常はgit管理外の`.harness/config.local.toml`で有効化する。
 - TOMLが無く旧JSONだけがある場合は互換読込して移行warningを出す。TOMLがあれば旧JSONはmergeしない。
 - plugin既定は `lifecycle: balanced`。Claude Codeは全roleで `model: inherit` / `effort: inherit`。
   CodexはPlanner=`gpt-5.6-sol`/`high`、Generator=`gpt-5.6-luna`/`xhigh`、
@@ -252,7 +255,7 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   resolverが明示値を返した場合は、正確な`model` / `reasoning_effort`を付けて実roleを1回だけ
   `dispatch-attempt`する。custom agentを選ぶときの入力名は`agent_type`であり、`agent_role`は渡さない。
   `agent_role`は起動後のchild metadataで確認する値である。
-- この契約は既定のLuna / Solだけに限定しない。共有config、個人config、またはユーザーが明示した任意の
+- この契約は明示設定のLuna / Solだけに限定しない。共有config、個人config、またはユーザーが明示した任意の
   正式なmodel / effortについて、resolverの`effective`値を推測・別名変換せずそのままdispatchする。
   起動後はchildのhost metadataで指定値との一致を確認し、一致した場合だけ`launch-verified`とする。
 - `model`または`reasoning_effort`自体が`unknown field`として子作成前に拒否された場合は、model値の
@@ -308,14 +311,28 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - Codexでは、利用repoのcustom agentまたは現在のspawn面がrole別指定を受け付ける場合だけ適用する。
   Codex plugin manifestはAgent定義を配布しないため、設定があるだけでcustom agentが作られたとは扱わない。
   custom agentが無くても、built-in/default childへ`model` / `reasoning_effort`を直接渡せる場合はその経路を使う。
+- resolverの`hosts.codex.roles.<role>.dispatch`を実際の起動契約として使う。`mode`が`direct`なら既存経路、
+  `custom-agent`なら`agentType`、`reasoningEffort`、`forkTurns`をそのまま使う。`status: blocked`ではdispatchしない。
+- `hosts.codex.custom_agents.enabled = true`で、Planner / Generator / Evaluatorの解決済みmodelが正確に
+  `gpt-5.6-luna`なら、全role共通の`harness_luna_worker`経路を使う。このとき`model` overrideは渡さず、
+  `effort`が`inherit`でなければ解決済み値だけを`reasoning_effort`へ渡す。必ず`fork_turns: "none"`のfresh childとし、
+  full-history forkやresumeは使わない。
+- Luna定義の`missing` / `conflict`は成功扱いしない。resolverはread-onlyであり、global directory/fileを作成・変更しない。
+  `missing`では作成先と完全なTOMLを示してユーザーの明示承認を待つ。承認後だけ
+  `node "$PLUGIN_ROOT/scripts/provision-codex-agent.mjs" --approve`を実行する。`conflict`では既存定義を上書きせず、
+  手動修正か`enabled = false`を案内する。新規作成後は現在taskでdispatchせず、新しいCodex taskで再開する。
+- provision処理は既存互換定義を変更せず再利用し、不正TOML・名前/model/instructionsの不一致・
+  `model_reasoning_effort`固定を競合として拒否する。診断・テストには`--codex-home <path>`を使えるが、
+  実homeへの書込みはユーザー承認後だけ行う。
 - 既存の `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.codex/agents/`、既存設定は一切上書きしない。
 - Codexの通常GeneratorはLuna/xhigh。Lunaが利用不能ならstrongのSol/highを試し、Solも利用不能なら
   model / effortを`inherit`へ戻してwarningを出す。Terraは通常・昇格・availability fallbackの候補にしない。
-- **2026-07-20の実起動基準**: Codex CLIではSol/highの親からnative `spawn_agent`へ
+- **2026-07-20 CLI実起動基準 / 2026-08-03 App追加確認**: Codex CLIではSol/highの親からnative `spawn_agent`へ
   `fork_turns: "none"`、`model: "gpt-5.6-luna"`、`reasoning_effort: "xhigh"`を渡し、子metadataでも
   Luna/xhighを確認済み。CLI `0.144.6`では公開schemaに両引数が無くてもruntime parserが受理した。
-  このrole別routingのフル経路はCLIで利用する。Codex AppはfreshなSol/highとTerra/xhighを確認済みだが、
-  2026-07-20の再確認でもLunaは`Unknown model`で拒否されたため現在は部分対応として扱う。
+  さらに2026-08-03には、新しいCodex App taskからproject custom agentを`agent_type`で選び、child metadataで
+  Luna/mediumを確認済み。custom agent定義を追加する前から開いているtaskへ新しいagent名が反映されない場合は、
+  そのtaskで失敗扱いにせず、新しいtaskで再開する。
 - 上記は固定の製品判定ではない。Harness開始時とhost更新後に現在のspawn面・利用可能model一覧・
   application pathを再観測する。AppでLunaが観測できたら同じconfigをnative Lunaへ適用し、コードや
   導入repoのconfigを書き換えない。ユーザー明示のTerraは利用可能なら適用できるが、自動経路には入れない。
@@ -403,6 +420,8 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   Agentへは設定値を再解釈させず、正本ファイルのpathと対象Sprintだけを渡す。
 - high-risk Sprint、2回目の連続`implementation-issue`、証拠付きEvaluator推薦ではresolverが最初からstrongを
   選ぶため、Lunaの試行を挟まずSol/highをdispatchする。起動試行はモデル選択後に行い、昇格規則を上書きしない。
+- strong判定はcustom agent選択より先に適用する。strong Generatorの`dispatch.mode`は`direct`であり、
+  `harness_luna_worker`を試さず、`agent_type`を渡さないfreshなSol/highとしてdispatchする。
 - 完了後、対象の `docs/progress/sprint-*.md` に自己評価と引き渡し事項（起動方法・URL・テストシナリオ・
   回帰チェックの実行コマンド）が書かれていることを確認し、Status を `awaiting-eval` にする。
 - 前スプリントの不合格フィードバックがあれば、Generator はそれを先に直す。

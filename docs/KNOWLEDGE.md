@@ -247,17 +247,17 @@ definitions, so Codex uses an existing capable spawn surface when present and in
 
 Shared runtime intent lives in `.harness/config.toml`; `.harness/config.local.toml` supplies personal leaf-only
 overrides and is ignored by the nested `.harness/.gitignore`. Resolution order is personal explicit value, shared
-explicit value, then plugin default. Lifecycle defaults to `balanced`. Claude Code role model/effort defaults remain
-`inherit`; Codex defaults Planner and Evaluator to `gpt-5.6-sol` / `high`, standard Generator to
-`gpt-5.6-luna` / `xhigh`, and strong Generator to `gpt-5.6-sol` / `high`.
+explicit value, then plugin default. Lifecycle defaults to `balanced`. Both Claude Code and Codex default every role's
+model and effort to `inherit`, including the Codex strong Generator leaves.
 
 `balanced` reuses the same role between Sprints only when `resume: true` is backed by host metadata showing that the
 routed model and effort are preserved; merely accepting a follow-up is insufficient. `fresh` rotates Generator and
 Evaluator at a new Sprint boundary. Same-Sprint retries resume only with that same preservation evidence, and a
 Generator model-tier change always forces fresh work.
 Generator and Evaluator never share a session. Model and effort are resolved independently per host and role, with no
-cross-host name translation. Unsupported leaves warn and fall back to inheritance. If standard Luna is confirmed
-unavailable, routing tries the configured strong Sol/high pair; if Sol is also unavailable, both leaves inherit.
+cross-host name translation. Unsupported leaves warn and fall back to inheritance. When standard Luna and strong
+Sol/high are explicitly configured, unavailable Luna routes to the configured strong pair; if Sol is also unavailable,
+both leaves inherit.
 Terra is not an automatic standard, strong, or availability-fallback candidate.
 
 Generator routing is file-backed through `Model Tier: standard | strong` and an explicit `Rotate` reason in
@@ -431,27 +431,45 @@ describe Planner, Generator, and Evaluator as roles and place any multiple-Agent
 
 ### Model Policy
 
-The plugin does not hardcode or infer Claude-specific model names such as `opus`; Claude Code inherits the host/user
-model and effort unless the user supplies a host-valid explicit override. Codex uses the Sol/Luna role defaults described
-above, but only through a confirmed Codex custom-agent or spawn surface. Codex names are never translated into Claude
-names. A config or resolver value alone is not proof that a Subagent launched with it.
+The plugin does not hardcode or infer Claude-specific model names such as `opus`. Both Claude Code and Codex inherit the
+host/user model and effort unless a host-valid explicit override is supplied. Explicit Codex overrides are applied only
+through a confirmed Codex custom-agent or spawn surface. Codex names are never translated into Claude names. A config or
+resolver value alone is not proof that a Subagent launched with it.
 
 #### Verified Codex surface matrix (2026-07-18; routing response refined through 2026-07-20)
 
-The full role-model routing path is currently verified on Codex CLI: a Sol/high CLI parent used native `spawn_agent`
+The full role-model routing path is currently verified on Codex CLI: a `gpt-5.6-sol` / `high` CLI parent used native `spawn_agent`
 with `fork_turns: "none"` to launch a fresh Luna/xhigh child, and the child rollout metadata recorded
 `gpt-5.6-luna` / `xhigh`. This was a native CLI subagent launch, not a shell-level direct `codex exec -m luna` substitute.
 On CLI 0.144.6 the displayed spawn schema omitted `model`, `reasoning_effort`, and `agent_type`, while the runtime parser
 accepted them. Harness therefore performs one exact real-role `dispatch-attempt` instead of treating schema omission alone
 as lack of support. `agent_type` selects a custom agent; `agent_role` is output metadata and is never a dispatch input.
 This applies to every exact model/effort selected by shared config, personal config, or an explicit user request, not only
-the bundled Luna/Sol defaults. Harness does not rename or guess the value, and launch verification requires matching child
-host metadata.
+the documented Luna/Sol routing example. Harness does not rename or guess the value, and launch verification requires
+matching child host metadata.
 
-Codex App is partially capable on the same date. Fresh Sol/high and Terra/xhigh overrides matched child metadata, while
-an explicit Luna request still failed with `Unknown model` on 2026-07-20. A follow-up turn on completed Sol/high and Terra/xhigh children
-recorded Sol/low, so App resume is not treated as preserving routed model/effort. This is observed runtime evidence,
-not a permanent product rule.
+Codex App's direct model-override path remained partial on 2026-07-20. Fresh Sol/high and Terra/xhigh overrides matched
+child metadata, while an explicit Luna request failed with `Unknown model`. A follow-up turn on completed Sol/high and
+Terra/xhigh children recorded Sol/low, so App resume is not treated as preserving routed model/effort. This is observed
+runtime evidence, not a permanent product rule.
+
+#### Luna custom-agent compatibility path (v0.5.1)
+
+On 2026-08-03, a new Codex App task successfully launched a project custom agent whose definition selected
+`gpt-5.6-luna`; child metadata recorded Luna with the dispatch-supplied `medium` effort. A definition with a fixed
+`model_reasoning_effort` instead overrode the dispatch value. The compatibility path therefore fixes only the model in a
+global `harness_luna_worker` definition, omits effort there, and passes the resolved role effort at dispatch time.
+
+The path is an explicit opt-in, `hosts.codex.custom_agents.enabled`, separate from role model selection and defaulting to
+`false`. When enabled, an exact Luna Planner, Generator, or Evaluator uses `agent_type = "harness_luna_worker"`, no model
+override, and `fork_turns: "none"`. Every dispatch is fresh; custom-agent resume and full-history forks are not used. A
+strong Generator decision is resolved first and goes directly to fresh Sol/high without trying the Luna agent.
+
+The resolver remains read-only. It reports a missing or conflicting global definition but never writes one. The separate
+`provision-codex-agent.mjs` command creates a missing definition only with `--approve`, validates it after writing, reuses
+an already compatible file, and never overwrites a conflict. Because Codex discovers agent names when a task starts, a
+new definition takes effect from a new Codex task. This is a temporary compatibility layer: once direct Luna dispatch is
+reliably available, users can disable it without changing their role model settings.
 
 Shared `.harness/config.toml` therefore expresses desired role values only; it does not duplicate App and CLI settings.
 The orchestrator supplies a current capability snapshot with available models, efforts, and role-level application paths.
