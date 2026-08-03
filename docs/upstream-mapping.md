@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `aafdf97d1f673a856c5a2a2fe72f87f1a4b57e89` (Agentic Harness v0.5.0)
+- Current synchronized base: `747a8fbd06000144ca7e27330bf1d32495475fe0` (Agentic Harness v0.5.1, Codex Luna custom-agent互換経路)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -43,6 +43,7 @@ CLAUDE.md
 LICENSE
 README.md
 docs/KNOWLEDGE.md
+docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
 plugins/harness/.claude-plugin/plugin.json
 plugins/harness/.codex-plugin/plugin.json
@@ -53,8 +54,10 @@ plugins/harness/commands/harness.md
 plugins/harness/hooks/hooks.json
 plugins/harness/hooks/session-start.sh
 plugins/harness/scripts/check-runtime-config.mjs
+plugins/harness/scripts/codex-custom-agent.mjs
 plugins/harness/scripts/harness.mjs
 plugins/harness/scripts/init-guidance.sh
+plugins/harness/scripts/provision-codex-agent.mjs
 plugins/harness/scripts/resolve-runtime-config.mjs
 plugins/harness/skills/harness-loop/SKILL.md
 plugins/harness/skills/using-harness/SKILL.md
