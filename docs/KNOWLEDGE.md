@@ -217,12 +217,29 @@ Instead:
 
 Initialization and development start are separate user intents. Claude Code exposes `/harness init` and `/harness check`;
 Codex routes `$using-harness init`, `$using-harness check`, and equivalent natural-language requests through the same bundled
-`scripts/harness.mjs`. `init` reuses `init-guidance.sh` after a complete destination preflight. `check` is read-only and reports
-safe gaps separately from unsafe path conflicts. Both stop before Planner or Sprint work begins.
+`scripts/harness.mjs`. After a complete destination preflight, `init` uses the existing `init-guidance.sh` on POSIX and a
+Node-native writer on Windows. `check` is read-only and reports safe gaps separately from unsafe path conflicts. Both stop
+before Planner or Sprint work begins.
 
 This surface intentionally does not infer whether existing files are current. A future `upgrade` needs migration policy for
 repo-owned guidance and configuration, so it remains separate and is not implemented. The bundled command requires no target
 repository package manifest, lockfile, dependency directory, or network access.
+
+#### Windows initialization permission preflight (v0.5.2)
+
+The Node.js preflight keeps POSIX mode-bit checks as a second signal alongside `fs.accessSync`. Windows does not model
+directory search permission as a POSIX execute bit, and a writable directory may report no `0o111` bit. The preflight
+therefore ignores only execute bits on `win32`; read/write mode checks and `fs.accessSync` remain required. Path type,
+symlink, destination inventory, and no-overwrite checks are unchanged. On Windows, the entry point keeps the writes in
+the Node.js process instead of delegating `mkdir`, `cp`, or output redirection to MSYS. This handles Windows sandboxes where
+Node's native file APIs are allowed but MSYS child-process writes are denied. The Node writer preserves custom guidance,
+legacy JSON behavior, exact ignore-rule additions, `git check-ignore` verification, and idempotence. POSIX continues to use
+the unchanged bash initializer.
+
+The repository regression `node scripts/check-windows-init.mjs --require-windows` exercises a native Windows temporary
+repository whose path contains spaces, Japanese text, and shell metacharacters, then verifies `init`, read-only `check`,
+idempotent re-init, owner-file preservation, and absence of target-package dependencies. The same regression directly
+exercises the Node writer on macOS and fixes the platform-selection contract (`win32` = Node, POSIX = bash).
 
 ### No Target-Repository Dependency Installation
 
