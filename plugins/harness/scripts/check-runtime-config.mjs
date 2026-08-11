@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveRuntimeConfig } from "./resolve-runtime-config.mjs";
+import { permissionBitsAllow } from "./platform-permissions.mjs";
 
 const require = createRequire(import.meta.url);
 const { parse: parseToml, stringify: stringifyToml } = require("../vendor/smol-toml/index.cjs");
@@ -197,6 +198,16 @@ const checks = [];
 function check(name, run) {
   checks.push({ name, run });
 }
+
+check("permission preflight ignores only directory execute mode bits on Windows", () => {
+  const noPermissions = { mode: 0 };
+  assert.equal(permissionBitsAllow(noPermissions, 0o111, "win32"), true);
+  assert.equal(permissionBitsAllow(noPermissions, 0o222, "win32"), false);
+  assert.equal(permissionBitsAllow(noPermissions, 0o444, "win32"), false);
+  assert.equal(permissionBitsAllow({ mode: 0o200 }, 0o222, "win32"), true);
+  assert.equal(permissionBitsAllow(noPermissions, 0o111, "linux"), false);
+  assert.equal(permissionBitsAllow({ mode: 0o700 }, 0o111, "darwin"), true);
+});
 
 check("shared TOML separates settings from reference and requires exact official values for AI edits", () => {
   const template = path.join(pluginRoot, "templates/.harness/config.toml");

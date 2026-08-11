@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `747a8fbd06000144ca7e27330bf1d32495475fe0` (Agentic Harness v0.5.1, Codex Luna custom-agent互換経路)
+- Current synchronized base: `4e2f9b921e01b5d7daadfd4b3c6340b4544f893a` (Agentic Harness v0.5.2, Windows初期化permission preflight)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -23,7 +23,7 @@ downstream独自ファイルは `gentle-overlay/downstream-files.txt` に列挙�
 | Planner / Generator / Evaluator | 保持。各agentにyasashii節を追加 |
 | using-harness / harness-loop | 保持。harness-loopにyasashii節を追加 |
 | commands / hooks | 上流資産として保持。Claude Codeで使用し、Codexには配布しない |
-| runtime resolver / checker / init guidance | 上流実装を保持。node有無の薄いwrapperだけ追加 |
+| runtime resolver / checker / init guidance / Windows Node writer | 上流実装を保持。node有無の薄いwrapperだけ追加 |
 | loop-rule vocabulary check (`scripts/check-loop-rules.mjs`) | 上流資産として保持。downstream回帰からも実行する |
 | templates / vendor | そのまま保持 |
 | LICENSE | downstream所有。著作権表示だけdownstream名義（MITは維持） |
@@ -55,8 +55,11 @@ plugins/harness/hooks/hooks.json
 plugins/harness/hooks/session-start.sh
 plugins/harness/scripts/check-runtime-config.mjs
 plugins/harness/scripts/codex-custom-agent.mjs
+plugins/harness/scripts/git-bash-path.mjs
 plugins/harness/scripts/harness.mjs
 plugins/harness/scripts/init-guidance.sh
+plugins/harness/scripts/node-guidance-initializer.mjs
+plugins/harness/scripts/platform-permissions.mjs
 plugins/harness/scripts/provision-codex-agent.mjs
 plugins/harness/scripts/resolve-runtime-config.mjs
 plugins/harness/skills/harness-loop/SKILL.md
@@ -71,6 +74,7 @@ plugins/harness/vendor/smol-toml/README.md
 plugins/harness/vendor/smol-toml/index.cjs
 scripts/check-loop-rules.mjs
 scripts/check-positioning.mjs
+scripts/check-windows-init.mjs
 ```
 
 ## 同期後の目視確認
@@ -79,3 +83,10 @@ scripts/check-positioning.mjs
 2. upstreamの追加・変更された節を読み、yasashii節と矛盾しないか確認する。
 3. 6規律、3 Agent分離、証跡、評価閾値、回帰ゼロ許容が緩んでいないことを確認する。
 4. 問題がなければdownstreamだけにcommitし、upstreamへpushしない。
+
+## v0.5.2 同期メモ
+
+- upstream-owned coreは固定SHA `4e2f9b921e01b5d7daadfd4b3c6340b4544f893a` のbytesを保持する。
+- upstreamで追加されたWindows用の4ファイルは上のinventoryへ分類済み。
+- downstream-owned `README.md` には、WindowsでNode-native initializerを選ぶ利用者向け説明だけを取り込んだ。
+- upstreamのWindows実機PASSは固定上流候補の証跡であり、このdownstream candidateのWindows PASSには流用しない。

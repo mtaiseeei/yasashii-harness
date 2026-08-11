@@ -21,8 +21,12 @@ const TARGET_PATHS = [
   "plugins/harness/agents/evaluator.md",
   "plugins/harness/commands/harness.md",
   "plugins/harness/scripts/harness.mjs",
+  "plugins/harness/scripts/git-bash-path.mjs",
+  "plugins/harness/scripts/node-guidance-initializer.mjs",
+  "plugins/harness/scripts/platform-permissions.mjs",
   "plugins/harness/hooks/session-start.sh",
   "plugins/harness/templates/docs/harness-guidance.md",
+  "scripts/check-windows-init.mjs",
 ];
 
 function parseArgs(argv) {
@@ -114,6 +118,9 @@ function validatePositioning(repoRoot) {
       "Claude Code / Codex 両対応",
       "docs/sprints/state.md",
       "続きから",
+      "0.5.2: Windowsでも安全に初期化",
+      "node scripts/check-windows-init.mjs --require-windows",
+      "Windows実機の代替証跡にはなりません",
     ]);
     appearsNear("README.md", readme, "やさしさは、言葉遣い", "緩めません");
   });
@@ -274,6 +281,17 @@ function validatePositioning(repoRoot) {
     assert.equal(claudeManifest.version, codexManifest.version);
     assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
     assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);
+    assert.equal(claudeManifest.version, "0.5.2");
+  });
+
+  check("Yasashii distribution identity remains downstream-owned", () => {
+    assert.equal(claudeMarketplace.name, "yasashii-harness");
+    assert.equal(codexMarketplace.name, "yasashii-harness");
+    assert.equal(claudeMarketplace.plugins[0].repository, "https://github.com/mtaiseeei/yasashii-harness");
+    for (const manifest of [claudeManifest, codexManifest]) {
+      assert.equal(manifest.repository, "https://github.com/mtaiseeei/yasashii-harness");
+      assert.equal(manifest.homepage, "https://github.com/mtaiseeei/yasashii-harness");
+    }
   });
 
   check("marketplaces describe the same product", () => {

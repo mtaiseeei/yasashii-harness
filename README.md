@@ -52,6 +52,23 @@ codex plugin add harness@yasashii-harness
 `init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
 `upgrade`はまだ実装していないため、上流更新はこのリポジトリの同期手順で取り込みます。
 
+### 0.5.2: Windowsでも安全に初期化
+
+Windowsでは、同じ事前検査を通したあと、Node.js自身が不足ファイルを書き込みます。
+WindowsにないPOSIXのディレクトリ実行bit `0o111`だけを判定から外し、read/write、
+`fs.accessSync`、symlink、ファイル種別、no-overwrite（既存ファイルを上書きしないこと）は
+これまでどおり確認します。既存の独自ガイダンス、旧JSON設定、`.gitignore`も保持します。
+macOS/Linuxは従来のBash initializerを維持します。
+
+保守者がWindows実機で確認するときは、`git`をPATHから利用できる状態で次を実行します。
+
+```powershell
+node scripts/check-windows-init.mjs --require-windows
+```
+
+引数なしの同じcheckはmacOS/Linuxでも共通ロジックを検査できます。`--require-windows`は
+Windows以外ではrunner判定だけが失敗するため、Windows実機の代替証跡にはなりません。
+
 ## 何をしてくれるか
 
 - **企画（Planner）**: 短い指示から、大事な決めごとを選択式の質問で確認し、仕様とSprint計画に

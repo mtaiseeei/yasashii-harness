@@ -50,12 +50,35 @@ expect_ok "Claude marketplace metadata is valid" python3 -m json.tool "$ROOT/.cl
 expect_ok "Codex marketplace metadata is valid" python3 -m json.tool "$ROOT/.agents/plugins/marketplace.json"
 expect_ok "metadata allowlist is valid" python3 -m json.tool "$ROOT/gentle-overlay/metadata-overrides.json"
 expect_ok "upstream runtime check remains available" test -f "$ROOT/plugins/harness/scripts/check-runtime-config.mjs"
+expect_ok "Windows Git Bash path helper remains available" test -f "$ROOT/plugins/harness/scripts/git-bash-path.mjs"
+expect_ok "Windows Node initializer remains available" test -f "$ROOT/plugins/harness/scripts/node-guidance-initializer.mjs"
+expect_ok "platform permission helper remains available" test -f "$ROOT/plugins/harness/scripts/platform-permissions.mjs"
+expect_ok "Windows init regression remains available" test -f "$ROOT/scripts/check-windows-init.mjs"
 expect_ok "loop-rule vocabulary regression" node "$ROOT/scripts/check-loop-rules.mjs"
 expect_ok "upstream templates remain available" test -f "$ROOT/plugins/harness/templates/.harness/config.toml"
 expect_ok "upstream vendor remains available" test -f "$ROOT/plugins/harness/vendor/smol-toml/index.cjs"
 expect_ok "upstream LICENSE remains available" test -f "$ROOT/LICENSE"
 expect_ok "sync and runtime wrappers are executable" test -x "$ROOT/scripts/sync-harness.sh"
 expect_ok "downstream regression is executable" test -x "$ROOT/scripts/regression-check.sh"
+expect_ok "Windows init regression passes all 8 labels" node "$ROOT/scripts/check-windows-init.mjs"
+
+platform="$(node -p 'process.platform')"
+required_output="$(node "$ROOT/scripts/check-windows-init.mjs" --require-windows 2>&1)"
+required_rc=$?
+if [[ "$platform" == "win32" ]]; then
+  if [[ $required_rc -eq 0 && "$required_output" == *"WINDOWS_INIT_PASS=8 FAIL=0 OS=win32"* ]]; then
+    ok "Windows-required init gate passes on Windows"
+  else
+    ng "Windows-required init gate passes on Windows"
+  fi
+elif [[ $required_rc -ne 0 \
+  && "$required_output" == *"FAIL runner requirement:"* \
+  && "$required_output" == *"WINDOWS_INIT_PASS=7 FAIL=1 OS=$platform"* \
+  && "$(printf '%s\n' "$required_output" | grep -c '^FAIL ')" -eq 1 ]]; then
+  ok "Windows-required init gate fails only the runner label off Windows"
+else
+  ng "Windows-required init gate fails only the runner label off Windows"
+fi
 
 idempotent="$(fresh idempotent)"
 before="$(digest "$idempotent")"

@@ -4,12 +4,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { toGitBashPath } from "./git-bash-path.mjs";
+import {
+  ignoreRules,
+  initializerKindForPlatform,
+  runNodeGuidanceInitializer,
+} from "./node-guidance-initializer.mjs";
+import { permissionBitsAllow } from "./platform-permissions.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
 const initializer = path.join(scriptDir, "init-guidance.sh");
 const templatesRoot = path.join(pluginRoot, "templates");
-const ignoreRules = ["config.local.toml", "config.local.json"];
 
 const directoryTargets = [
   ".harness",
@@ -135,10 +141,6 @@ function canAccess(target, mode) {
   }
 }
 
-function modeAllows(stat, mask) {
-  return (stat.mode & mask) !== 0;
-}
-
 function inspect(root, { includePermissions = false } = {}) {
   const entries = [];
   const unsafe = [];
@@ -231,7 +233,7 @@ function inspect(root, { includePermissions = false } = {}) {
   const ignorePath = path.join(root, ".harness/.gitignore");
   const ignoreStat = lstat(ignorePath);
   if (ignoreStat?.isFile() && !ignoreStat.isSymbolicLink()) {
-    if (!modeAllows(ignoreStat, 0o444) || !canAccess(ignorePath, fs.constants.R_OK)) {
+    if (!permissionBitsAllow(ignoreStat, 0o444) || !canAccess(ignorePath, fs.constants.R_OK)) {
       unsafe.push("[unsafe] .harness/.gitignore: file is not readable");
     } else {
       const rules = new Set(fs.readFileSync(ignorePath, "utf8").split(/\r?\n/u));
@@ -251,7 +253,7 @@ function inspect(root, { includePermissions = false } = {}) {
       const stat = lstat(target);
       if (stat?.isFile()) {
         if (!checked.has(target)
-          && (!modeAllows(stat, 0o222) || !canAccess(target, fs.constants.W_OK))) {
+          && (!permissionBitsAllow(stat, 0o222) || !canAccess(target, fs.constants.W_OK))) {
           unsafe.push(`[unsafe] ${path.relative(root, target)}: file is not writable`);
         }
         checked.add(target);
@@ -263,8 +265,8 @@ function inspect(root, { includePermissions = false } = {}) {
         continue;
       }
       if (!checked.has(ancestor.path)
-        && (!modeAllows(ancestor.stat, 0o222)
-          || !modeAllows(ancestor.stat, 0o111)
+        && (!permissionBitsAllow(ancestor.stat, 0o222)
+          || !permissionBitsAllow(ancestor.stat, 0o111)
           || !canAccess(ancestor.path, fs.constants.W_OK | fs.constants.X_OK))) {
         unsafe.push(`[unsafe] ${path.relative(root, ancestor.path) || "."}: directory is not writable`);
       }
@@ -312,10 +314,31 @@ function runInit(root) {
     return 2;
   }
 
-  const initialized = spawnSync("bash", [initializer, root], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  let initialized;
+  if (initializerKindForPlatform() === "node") {
+    try {
+      initialized = runNodeGuidanceInitializer(root, { pluginRoot });
+    } catch (error) {
+      console.error(`Harness init failed: ${error.message}`);
+      return 2;
+    }
+  } else {
+    let bashInitializer;
+    let bashRoot;
+    try {
+      bashInitializer = toGitBashPath(initializer);
+      bashRoot = toGitBashPath(root);
+    } catch (error) {
+      console.error(`[unsafe] Harness path conversion failed: ${error.message}`);
+      console.error("Harness init refused: unsafe target; no files were changed.");
+      return 2;
+    }
+
+    initialized = spawnSync("bash", [bashInitializer, bashRoot], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  }
   if (initialized.stdout) process.stdout.write(initialized.stdout);
   if (initialized.stderr) process.stderr.write(initialized.stderr);
   if (initialized.error) {
