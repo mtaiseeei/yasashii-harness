@@ -52,6 +52,18 @@ codex plugin add harness@yasashii-harness
 `init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
 `upgrade`はまだ実装していないため、上流更新はこのリポジトリの同期手順で取り込みます。
 
+### 0.5.3: Lunaを追加定義なしで直接利用
+
+Codexでは、`gpt-5.6-luna`とeffortをnative `spawn_agent`のbuilt-in/default Agentへ
+直接渡します。Harness専用のcustom agent定義や、その定義を作るprovisioning scriptは配布しません。
+2026-08-17にCodex Desktop `0.148.0-alpha.9`、multi-agent v2でLuna/xhighの子Agentを
+起動し、child session metadataがmodel、effort、agent role `default`と一致することを確認しました。
+
+旧`hosts.codex.custom_agents`設定は、既存repoを止めないため読み取りますが、値が`true`でも
+`false`でもroutingには使わず、非推奨warningを表示します。既存設定やユーザー自身のAgent定義を
+削除する必要はありません。Lunaが起動前に拒否された場合は、設定済みのstrong Solを試し、
+それも拒否された場合は`inherit`へ戻ります。Terraは自動fallbackに使いません。
+
 ### 0.5.2: Windowsでも安全に初期化
 
 Windowsでは、同じ事前検査を通したあと、Node.js自身が不足ファイルを書き込みます。

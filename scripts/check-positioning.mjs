@@ -118,6 +118,11 @@ function validatePositioning(repoRoot) {
       "Claude Code / Codex 両対応",
       "docs/sprints/state.md",
       "続きから",
+      "0.5.3: Lunaを追加定義なしで直接利用",
+      "built-in/default Agent",
+      "hosts.codex.custom_agents",
+      "既存設定やユーザー自身のAgent定義を",
+      "Terraは自動fallbackに使いません",
       "0.5.2: Windowsでも安全に初期化",
       "node scripts/check-windows-init.mjs --require-windows",
       "Windows実機の代替証跡にはなりません",
@@ -231,7 +236,10 @@ function validatePositioning(repoRoot) {
       "dispatch-ready",
       "launch-verified",
       "Terra",
-      "2026-07-18",
+      "2026-08-17",
+      "built-in/default",
+      "agent_role",
+      "hosts.codex.custom_agents",
       "Codex CLI",
       "Codex App",
       "full role-model routing",
@@ -242,6 +250,8 @@ function validatePositioning(repoRoot) {
       "Codex App",
       'fork_turns: "none"',
       "gpt-5.6-luna",
+      "built-in/default Agent",
+      "hosts.codex.custom_agents",
       "Unknown model",
     ]);
     includesAll("plugins/harness/agents/evaluator.md", evaluator, [
@@ -258,7 +268,7 @@ function validatePositioning(repoRoot) {
       "resume: true",
       "model / effort保持",
       "host metadata",
-      "freshなLuna Generator",
+      "freshなLuna/xhigh child",
     ]);
     includesAll("plugins/harness/templates/docs/harness-guidance.md", harnessGuidance, [
       "resume: true",
@@ -281,7 +291,7 @@ function validatePositioning(repoRoot) {
     assert.equal(claudeManifest.version, codexManifest.version);
     assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
     assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);
-    assert.equal(claudeManifest.version, "0.5.2");
+    assert.equal(claudeManifest.version, "0.5.3");
   });
 
   check("Yasashii distribution identity remains downstream-owned", () => {

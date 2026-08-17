@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `4e2f9b921e01b5d7daadfd4b3c6340b4544f893a` (Agentic Harness v0.5.2, Windows初期化permission preflight)
+- Current synchronized base: `2579d715d13beef7767cc30c3eb10af607ecd932` (Agentic Harness v0.5.3, native Luna direct dispatch)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -38,13 +38,27 @@ downstream独自ファイルは `gentle-overlay/downstream-files.txt` に列挙�
 .agents/plugins/marketplace.json
 .claude-plugin/marketplace.json
 .gitignore
+.harness/.gitignore
+.harness/config.toml
 AGENTS.md
 CLAUDE.md
 LICENSE
 README.md
 docs/KNOWLEDGE.md
+docs/feedback/sprint-001.md
+docs/harness-guidance.md
+docs/progress/sprint-001.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
+docs/spec.md
+docs/spec/constraints.md
+docs/spec/domain.md
+docs/spec/features.md
+docs/spec/product.md
+docs/spec/rubric.md
+docs/spec/ui.md
+docs/sprints/sprint-001.md
+docs/sprints/state.md
 plugins/harness/.claude-plugin/plugin.json
 plugins/harness/.codex-plugin/plugin.json
 plugins/harness/agents/evaluator.md
@@ -54,13 +68,11 @@ plugins/harness/commands/harness.md
 plugins/harness/hooks/hooks.json
 plugins/harness/hooks/session-start.sh
 plugins/harness/scripts/check-runtime-config.mjs
-plugins/harness/scripts/codex-custom-agent.mjs
 plugins/harness/scripts/git-bash-path.mjs
 plugins/harness/scripts/harness.mjs
 plugins/harness/scripts/init-guidance.sh
 plugins/harness/scripts/node-guidance-initializer.mjs
 plugins/harness/scripts/platform-permissions.mjs
-plugins/harness/scripts/provision-codex-agent.mjs
 plugins/harness/scripts/resolve-runtime-config.mjs
 plugins/harness/skills/harness-loop/SKILL.md
 plugins/harness/skills/using-harness/SKILL.md
@@ -84,9 +96,11 @@ scripts/check-windows-init.mjs
 3. 6規律、3 Agent分離、証跡、評価閾値、回帰ゼロ許容が緩んでいないことを確認する。
 4. 問題がなければdownstreamだけにcommitし、upstreamへpushしない。
 
-## v0.5.2 同期メモ
+## v0.5.3 同期メモ
 
-- upstream-owned coreは固定SHA `4e2f9b921e01b5d7daadfd4b3c6340b4544f893a` のbytesを保持する。
-- upstreamで追加されたWindows用の4ファイルは上のinventoryへ分類済み。
-- downstream-owned `README.md` には、WindowsでNode-native initializerを選ぶ利用者向け説明だけを取り込んだ。
-- upstreamのWindows実機PASSは固定上流候補の証跡であり、このdownstream candidateのWindows PASSには流用しない。
+- upstream-owned coreは固定SHA `2579d715d13beef7767cc30c3eb10af607ecd932` のbytesを保持する。
+- Harness専用custom agent定義を作る2つのprovisioning scriptは、上流での削除どおりdownstreamからも削除する。
+- downstream-owned `README.md` には、native built-in/default AgentへのLuna direct dispatch、旧設定のwarning付き無視、
+  Luna→設定済みstrong Sol→`inherit`、Terra非選択を利用者向けに短く反映した。
+- downstream-owned `scripts/check-positioning.mjs` はYasashii配布識別を守りながら、0.5.3のversionとrouting説明も回帰対象にする。
+- 上流Sprintのspec、progress、feedback、stateは上流treeの一部としてbytesを保持し、Yasashii側の別Sprintとして再解釈しない。

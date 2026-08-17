@@ -24,6 +24,11 @@ effort = "inherit"
 
 # EN: Codex roles inherit the current host model and effort by default.
 # JA: Codexの各roleも既定で現在のhost model / effortを継承します。
+[hosts.codex.custom_agents]
+# EN: Opt in to the global harness_luna_worker path when a role resolves to exactly gpt-5.6-luna.
+# JA: roleが正確にgpt-5.6-lunaへ解決された場合にglobal harness_luna_worker経路を使う明示スイッチです。
+enabled = false
+
 [hosts.codex.roles.planner]
 model = "inherit"
 effort = "inherit"
@@ -91,12 +96,18 @@ max_spec_issue_returns = 2
 # JA: 配布時のCodex各roleはすべてinheritです。共有設定、個人設定、またはユーザー指定で明示した値には、
 # JA: 引き続きstandard / strongのrouting規則を適用します。Terraは自動選択しません。
 
-# EN: A displayed Codex spawn schema may omit model and effort even when the runtime parser accepts them.
-# EN: Try the resolver's exact dispatch-attempt values once on the actual built-in/default role. Pass the
-# EN: exact model and reasoning_effort directly. Resolver output is not launch proof; launch-verified requires
+# EN: custom_agents.enabled controls only the application path. When true, an exact Luna role uses
+# EN: harness_luna_worker without a model override, passes only the resolved effort, and always starts fresh.
+# EN: The global definition is never created by the resolver; provisioning requires explicit approval.
+# JA: custom_agents.enabledは起動経路だけを切り替えます。trueかつLunaのroleはmodelを重ねて渡さず、
+# JA: 解決済みeffortだけを渡して毎回freshに起動します。resolverはglobal定義を作成せず、作成には明示承認が必要です。
+
+# EN: A displayed Codex spawn schema may omit model, effort, and agent_type even when the runtime parser
+# EN: accepts them. Try the resolver's exact dispatch-attempt values once on the actual role. Use agent_type,
+# EN: never agent_role, for a custom agent. Resolver output is not launch proof; launch-verified requires
 # EN: matching child host metadata or a host trace. This applies to every exact model/effort, not only Luna/Sol.
-# JA: Codexの公開spawn schemaにmodel、effortが無くてもruntime parserが受理する場合があります。
-# JA: resolverの正確なdispatch-attempt値をbuilt-in/default roleへ直接渡して1回試します。
+# JA: Codexの公開spawn schemaにmodel、effort、agent_typeが無くてもruntime parserが受理する場合があります。
+# JA: resolverの正確なdispatch-attempt値を実roleで1回試し、custom agentにはagent_typeを使います。
 # JA: resolver出力だけは実起動の証拠ではなく、launch-verifiedには一致するchild metadata等が必要です。
 
 # Official references / 公式リファレンス:
