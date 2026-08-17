@@ -4,17 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import {
-  CODEX_LUNA_AGENT_NAME,
-  CODEX_LUNA_AGENT_TOML,
-  CODEX_LUNA_MODEL,
-  inspectCodexLunaAgent,
-} from "./codex-custom-agent.mjs";
 
 const require = createRequire(import.meta.url);
 const { parse: parseToml } = require("../vendor/smol-toml/index.cjs");
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
-const codexAgentProvisioner = path.join(scriptDirectory, "provision-codex-agent.mjs");
 
 const HOSTS = ["claudeCode", "codex"];
 const ROLES = ["planner", "generator", "evaluator"];
@@ -37,7 +29,6 @@ export const DEFAULT_CONFIG = Object.freeze({
     HOSTS.map((host) => [
       host,
       {
-        ...(host === "codex" ? { customAgents: { enabled: false } } : {}),
         roles: Object.fromEntries(ROLES.map((role) => {
           if (host === "codex" && role === "generator") {
             return [role, {
@@ -78,7 +69,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
   },
   codex: {
     // The Codex plugin manifest distributes skills, not agent definitions.
-    // A project custom agent or capable spawn surface must opt in explicitly.
+    // Explicit role values require a capable native spawn surface.
     subagents: null,
     resume: null,
     roleModel: false,
@@ -259,16 +250,16 @@ function validateConfig(config, label, source, warnings, { legacy = false } = {}
     if (!inspectTable(hostValue, `${label}.hosts.${host}`, hostFields)) continue;
     if (host === "codex" && own(hostValue, "custom_agents")) {
       const customAgentsPath = `${label}.hosts.codex.custom_agents`;
-      if (inspectTable(hostValue.custom_agents, customAgentsPath, ["enabled"])
-        && own(hostValue.custom_agents, "enabled")
-        && typeof hostValue.custom_agents.enabled !== "boolean") {
-        warnings.push(warning(
-          "invalid-config-value",
-          `${customAgentsPath}.enabled`,
-          "expected true or false",
-          { source, input: hostValue.custom_agents.enabled },
-        ));
-      }
+      warnings.push(warning(
+        "deprecated-config-key",
+        customAgentsPath,
+        "ignored: Harness no longer uses a Codex custom agent; native direct dispatch is effective, and existing settings or Agent definitions do not need to be deleted",
+        {
+          effective: "native-direct",
+          source,
+          input: hostValue.custom_agents,
+        },
+      ));
     }
     if (!own(hostValue, "roles")) continue;
     if (!inspectTable(hostValue.roles, `${label}.hosts.${host}.roles`, ROLES)) continue;
@@ -381,29 +372,6 @@ function chooseValue(personal, shared, host, role, field) {
   const sharedValue = explicitValue(shared, host, role, field);
   if (sharedValue !== undefined) return { value: sharedValue, source: "shared" };
   return { value: DEFAULT_CONFIG.hosts[host].roles[role][field], source: "plugin" };
-}
-
-function explicitCustomAgentEnabled(config) {
-  const customAgents = config?.hosts?.codex?.custom_agents;
-  return own(customAgents, "enabled") ? customAgents.enabled : undefined;
-}
-
-function chooseCustomAgentEnabled(personal, shared, warnings) {
-  const personalValue = explicitCustomAgentEnabled(personal);
-  const sharedValue = explicitCustomAgentEnabled(shared);
-  const selected = personalValue !== undefined
-    ? { value: personalValue, source: "personal" }
-    : sharedValue !== undefined
-      ? { value: sharedValue, source: "shared" }
-      : { value: DEFAULT_CONFIG.hosts.codex.customAgents.enabled, source: "plugin" };
-  if (typeof selected.value === "boolean") return selected;
-  warnings.push(warning(
-    "invalid-config-value",
-    "hosts.codex.custom_agents.enabled",
-    "expected true or false",
-    { source: selected.source, input: selected.value, effective: false },
-  ));
-  return { value: false, source: "fallback", inputSource: selected.source };
 }
 
 function chooseEscalationValue(personal, shared, field, warnings) {
@@ -778,54 +746,13 @@ function normalizeRoutingInput({ retryCount, failureKind, evaluatorRecommendatio
   };
 }
 
-function selectsCustomLuna(selected, customAgents, launchRejectedModels = []) {
-  return customAgents?.enabled?.value === true
-    && normalizeRuntimeValue(selected.value) === CODEX_LUNA_MODEL
-    && !launchRejectedModels.includes(CODEX_LUNA_MODEL);
-}
-
-function resolveCodexModel({
-  role,
-  selected,
-  customAgents,
-  capabilities,
-  capabilitySources,
-  warnings,
-  launchRejectedModels,
-  configPath,
-}) {
-  if (!selectsCustomLuna(selected, customAgents, launchRejectedModels)) {
-    return resolveField({
-      host: "codex",
-      role,
-      field: "model",
-      selected,
-      capabilities,
-      capabilitySources,
-      warnings,
-      launchRejectedValues: launchRejectedModels,
-      configPath,
-    });
-  }
-  const definitionStatus = customAgents.definition.status;
-  return {
-    requested: CODEX_LUNA_MODEL,
-    effective: CODEX_LUNA_MODEL,
-    source: selected.source,
-    status: definitionStatus === "compatible" ? "dispatch-attempt" : "blocked",
-    applicationPath: `Codex custom agent_type ${CODEX_LUNA_AGENT_NAME}`,
-    launchVerified: false,
-  };
-}
-
-function requestedModelAvailable(selected, capabilities, launchRejectedModels, customAgents) {
+function requestedModelAvailable(selected, capabilities, launchRejectedModels) {
   const value = normalizeRuntimeValue(selected.value);
   return typeof value !== "string"
     || value.length === 0
     || value === "inherit"
     || (!launchRejectedModels.includes(value)
-      && (selectsCustomLuna(selected, customAgents)
-        || !Array.isArray(capabilities.models)
+      && (!Array.isArray(capabilities.models)
         || capabilities.models.includes(value)));
 }
 
@@ -835,7 +762,6 @@ function generatorTierDecision({
   standardModel,
   capabilities,
   launchRejectedModels,
-  customAgents,
 }) {
   if (route.nextRole !== "generator") return { modelTier: null, reason: "generator-not-routed" };
   if (route.sprintRisk === "high") return { modelTier: "strong", reason: "high-risk-sprint" };
@@ -851,7 +777,7 @@ function generatorTierDecision({
   if (launchRejectedModels.includes(normalizeRuntimeValue(standardModel.value))) {
     return { modelTier: "strong", reason: "standard-model-launch-rejected" };
   }
-  if (!requestedModelAvailable(standardModel, capabilities, launchRejectedModels, customAgents)) {
+  if (!requestedModelAvailable(standardModel, capabilities, launchRejectedModels)) {
     return { modelTier: "strong", reason: "standard-model-unavailable" };
   }
   return {
@@ -860,48 +786,25 @@ function generatorTierDecision({
   };
 }
 
-function codexDispatchPlan({ settings, customAgents, customSelected, capabilities }) {
+function codexDispatchPlan({ settings }) {
   const effort = settings.effort.effective === "inherit" ? null : settings.effort.effective;
-  const lifecycleBlockedReason = settings.lifecycle?.action === "idle"
-    ? settings.lifecycle.reason === "spec issue routes to Planner"
+  const lifecycleBlockedReason = settings.lifecycle?.action === "isolated-work-unit"
+    && settings.lifecycle.reason === "subagents unavailable"
+    ? "subagents-unavailable"
+    : settings.lifecycle?.action === "idle"
+      ? settings.lifecycle.reason === "spec issue routes to Planner"
       ? "spec-issue-routes-to-planner"
       : settings.lifecycle.reason === "implementation retry does not require Planner"
         ? "implementation-retry-does-not-require-planner"
         : settings.lifecycle.reason
-    : null;
-  if (!customSelected) {
-    return {
-      mode: "direct",
-      status: lifecycleBlockedReason ? "blocked" : "ready",
-      agentType: null,
-      modelOverride: settings.model.effective === "inherit" ? null : settings.model.effective,
-      reasoningEffort: effort,
-      forkTurns: null,
-      resume: settings.lifecycle?.action === "resume",
-      definitionStatus: "not-used",
-      blockedReason: lifecycleBlockedReason,
-    };
-  }
-  const subagentsAvailable = capabilities.subagents !== false;
-  const ready = !lifecycleBlockedReason
-    && customAgents.definition.status === "compatible"
-    && subagentsAvailable;
+      : null;
   return {
-    mode: "custom-agent",
-    status: ready ? "ready" : "blocked",
-    agentType: CODEX_LUNA_AGENT_NAME,
-    modelOverride: null,
+    mode: "direct",
+    status: lifecycleBlockedReason ? "blocked" : "ready",
+    modelOverride: settings.model.effective === "inherit" ? null : settings.model.effective,
     reasoningEffort: effort,
-    forkTurns: "none",
-    resume: false,
-    definitionStatus: customAgents.definition.status,
-    blockedReason: ready
-      ? null
-      : customAgents.definition.status !== "compatible"
-        ? `agent-definition-${customAgents.definition.status}`
-        : lifecycleBlockedReason
-          ? lifecycleBlockedReason
-          : "subagents-unavailable",
+    resume: settings.lifecycle?.action === "resume",
+    blockedReason: lifecycleBlockedReason,
   };
 }
 
@@ -935,7 +838,6 @@ function validateRotate(rotate) {
 
 export function resolveRuntimeConfig({
   root = process.cwd(),
-  codexHome,
   event = "initial",
   host: selectedHost = "all",
   capabilityOverrides,
@@ -1023,61 +925,6 @@ export function resolveRuntimeConfig({
     lifecycle = { value: "balanced", source: "fallback" };
   }
   const limits = resolveLimits(personal, shared);
-  const customAgentEnabled = chooseCustomAgentEnabled(personal, shared, warnings);
-  const customAgentAppliesToSelection = ["all", "codex"].includes(selectedHost);
-  const provisionalCustomAgents = {
-    enabled: customAgentEnabled,
-    definition: { status: "not-checked" },
-  };
-  const standardGeneratorModel = chooseValue(personal, shared, "codex", "generator", "model");
-  const provisionalGeneratorTier = generatorTierDecision({
-    route,
-    escalation,
-    standardModel: standardGeneratorModel,
-    capabilities: capabilities.codex,
-    launchRejectedModels: normalizedRejectedModels,
-    customAgents: provisionalCustomAgents,
-  });
-  const generatorModelSelection = provisionalGeneratorTier.modelTier === "strong"
-    ? escalation.model
-    : standardGeneratorModel;
-  const customAgentNeeded = customAgentEnabled.value === true
-    && customAgentAppliesToSelection
-    && [
-      chooseValue(personal, shared, "codex", "planner", "model"),
-      generatorModelSelection,
-      chooseValue(personal, shared, "codex", "evaluator", "model"),
-    ].some((selected) => selectsCustomLuna(selected, provisionalCustomAgents, normalizedRejectedModels));
-  const customAgentDefinition = inspectCodexLunaAgent({
-    codexHome,
-    enabled: customAgentNeeded,
-  });
-  const codexCustomAgents = {
-    enabled: customAgentEnabled,
-    definition: customAgentDefinition,
-    provision: {
-      required: customAgentNeeded && customAgentDefinition.status === "missing",
-      command: `node ${JSON.stringify(codexAgentProvisioner)} --approve`,
-      requiresExplicitApproval: true,
-      proposedToml: customAgentDefinition.status === "missing" ? CODEX_LUNA_AGENT_TOML : null,
-      newTaskRequiredAfterCreation: true,
-    },
-  };
-  if (customAgentNeeded
-    && customAgentDefinition.status !== "compatible") {
-    warnings.push(warning(
-      `custom-agent-definition-${customAgentDefinition.status}`,
-      "hosts.codex.custom_agents.enabled",
-      customAgentDefinition.status === "missing"
-        ? `Luna custom agent definition is missing at ${customAgentDefinition.path}; explicit approval is required before provisioning`
-        : `Luna custom agent definition conflicts at ${customAgentDefinition.path}; it will not be overwritten`,
-      {
-        effective: "blocked",
-        source: customAgentEnabled.source,
-        causeSource: "agent-definition",
-      },
-    ));
-  }
 
   if (!["initial", "sprint-change", "retry"].includes(event)) {
     throw new Error(`invalid --event ${JSON.stringify(event)}; expected initial, sprint-change, or retry`);
@@ -1100,7 +947,6 @@ export function resolveRuntimeConfig({
         },
       };
       let forceFreshReason = null;
-      let customSelected = false;
       if (host === "codex" && role === "generator") {
         const standardModel = chooseValue(personal, shared, host, role, "model");
         const tier = generatorTierDecision({
@@ -1109,23 +955,18 @@ export function resolveRuntimeConfig({
           standardModel,
           capabilities: capabilities[host],
           launchRejectedModels: normalizedRejectedModels,
-          customAgents: codexCustomAgents,
         });
         const strong = tier.modelTier === "strong";
         const modelSelection = strong ? escalation.model : standardModel;
-        customSelected = !strong && selectsCustomLuna(
-          modelSelection,
-          codexCustomAgents,
-          normalizedRejectedModels,
-        );
-        settings.model = resolveCodexModel({
+        settings.model = resolveField({
+          host,
           role,
           selected: modelSelection,
-          customAgents: codexCustomAgents,
+          field: "model",
           capabilities: capabilities[host],
           capabilitySources: capabilitySources[host],
           warnings,
-          launchRejectedModels: normalizedRejectedModels,
+          launchRejectedValues: normalizedRejectedModels,
           configPath: strong
             ? "hosts.codex.roles.generator.escalation.model"
             : "hosts.codex.roles.generator.model",
@@ -1161,19 +1002,15 @@ export function resolveRuntimeConfig({
       } else {
         const modelSelection = chooseValue(personal, shared, host, role, "model");
         if (host === "codex") {
-          customSelected = selectsCustomLuna(
-            modelSelection,
-            codexCustomAgents,
-            normalizedRejectedModels,
-          );
-          settings.model = resolveCodexModel({
+          settings.model = resolveField({
+            host,
             role,
             selected: modelSelection,
-            customAgents: codexCustomAgents,
+            field: "model",
             capabilities: capabilities[host],
             capabilitySources: capabilitySources[host],
             warnings,
-            launchRejectedModels: normalizedRejectedModels,
+            launchRejectedValues: normalizedRejectedModels,
           });
         } else {
           settings.model = resolveField({
@@ -1217,32 +1054,13 @@ export function resolveRuntimeConfig({
         forceFreshReason,
       });
       if (host === "codex") {
-        if (customSelected && codexCustomAgents.definition.status !== "compatible") {
-          settings.lifecycle = {
-            action: "idle",
-            reason: `custom Luna agent definition is ${codexCustomAgents.definition.status}`,
-          };
-        } else if (customSelected
-          && capabilities[host].subagents !== false
-          && settings.lifecycle.action !== "idle") {
-          settings.lifecycle = {
-            action: "fresh",
-            reason: "custom Luna agents always start as fresh non-full-history children",
-          };
-        }
-        settings.dispatch = codexDispatchPlan({
-          settings,
-          customAgents: codexCustomAgents,
-          customSelected,
-          capabilities: capabilities[host],
-        });
+        settings.dispatch = codexDispatchPlan({ settings });
       }
       roles[role] = settings;
     }
     resolvedHosts[host] = {
       capabilities: capabilities[host],
       capabilitySources: capabilitySources[host],
-      ...(host === "codex" ? { customAgents: codexCustomAgents } : {}),
       roles,
       warningCount: warnings.length - hostWarningsStart,
     };
@@ -1327,7 +1145,6 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--root") options.root = path.resolve(requireArg(argv, index++, arg));
-    else if (arg === "--codex-home") options.codexHome = path.resolve(requireArg(argv, index++, arg));
     else if (arg === "--event") options.event = requireArg(argv, index++, arg);
     else if (arg === "--host") options.host = requireArg(argv, index++, arg);
     else if (arg === "--capabilities") options.capabilitiesPath = path.resolve(requireArg(argv, index++, arg));
@@ -1392,14 +1209,9 @@ function printText(result) {
   console.log(`Limits: lineage-dispatches=${result.limits.maxLineageDispatches.value} (${result.limits.maxLineageDispatches.source}); spec-issue-returns=${result.limits.maxSpecIssueReturns.value} (${result.limits.maxSpecIssueReturns.source})`);
   for (const [host, hostConfig] of Object.entries(result.hosts)) {
     console.log(`\n${host}`);
-    if (hostConfig.customAgents) {
-      console.log(
-        `  custom-agents: enabled=${hostConfig.customAgents.enabled.value} (${hostConfig.customAgents.enabled.source}); definition=${hostConfig.customAgents.definition.status}; path=${hostConfig.customAgents.definition.path}`,
-      );
-    }
     for (const [role, roleConfig] of Object.entries(hostConfig.roles)) {
       const dispatch = roleConfig.dispatch
-        ? `; dispatch=${roleConfig.dispatch.mode}/${roleConfig.dispatch.status}; agent_type=${roleConfig.dispatch.agentType ?? "none"}; model-override=${roleConfig.dispatch.modelOverride ?? "none"}; effort-override=${roleConfig.dispatch.reasoningEffort ?? "none"}; fork_turns=${roleConfig.dispatch.forkTurns ?? "host-default"}`
+        ? `; dispatch=${roleConfig.dispatch.mode}/${roleConfig.dispatch.status}; model-override=${roleConfig.dispatch.modelOverride ?? "none"}; effort-override=${roleConfig.dispatch.reasoningEffort ?? "none"}`
         : "";
       console.log(
         `  ${role}: ${roleConfig.lifecycle.action}; model=${roleConfig.model.effective} (${roleConfig.model.source}); effort=${roleConfig.effort.effective} (${roleConfig.effort.source})${roleConfig.routing ? `; tier=${roleConfig.routing.modelTier}` : ""}${dispatch}`,
@@ -1417,7 +1229,6 @@ function printText(result) {
 function usage() {
   return `Usage: node resolve-runtime-config.mjs [options]\n\n` +
     `  --root PATH             target repository (default: cwd)\n` +
-    `  --codex-home PATH       Codex home used for read-only custom-agent inspection\n` +
     `  --host HOST             claudeCode, codex, or all\n` +
     `  --event EVENT           initial, sprint-change, or retry\n` +
     `  --capabilities FILE     observed host capabilities JSON file\n` +

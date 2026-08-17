@@ -41,10 +41,9 @@ const REQUIRED = [
     "再評価の増分原則",
     "max_lineage_dispatches",
     "max_spec_issue_returns",
-    "hosts.codex.custom_agents.enabled",
-    "harness_luna_worker",
-    "provision-codex-agent.mjs",
-    'fork_turns: "none"',
+    "旧`hosts.codex.custom_agents`設定",
+    "native direct dispatch",
+    "built-in/default Agent",
   ]],
   ["plugins/harness/agents/evaluator.md", [
     "verification-scope-issue",
@@ -73,9 +72,8 @@ const REQUIRED = [
     "safe harbor",
     "Proportional Verification",
     "max_lineage_dispatches",
-    "hosts.codex.custom_agents.enabled",
-    "harness_luna_worker",
-    'fork_turns: "none"',
+    "legacy `hosts.codex.custom_agents` table",
+    "native direct dispatch",
   ]],
   ["plugins/harness/templates/AGENTS.md", [
     "verification-scope-issue",
@@ -85,23 +83,22 @@ const REQUIRED = [
     "safe harbor",
     "Proportional Verification",
     "max_lineage_dispatches",
-    "hosts.codex.custom_agents.enabled",
-    "harness_luna_worker",
-    'fork_turns: "none"',
+    "legacy `hosts.codex.custom_agents` table",
+    "native direct dispatch",
   ]],
   ["plugins/harness/templates/docs/harness-guidance.md", [
     "verification-scope-issue",
     "safe harbor",
     "done-by-user-decision",
-    "hosts.codex.custom_agents.enabled",
-    "provision-codex-agent.mjs",
+    "`hosts.codex.custom_agents` table is ignored",
+    "built-in/default Agent",
   ]],
   ["plugins/harness/templates/.harness/config.toml", [
     "[limits]",
     "max_lineage_dispatches",
     "max_spec_issue_returns",
-    "[hosts.codex.custom_agents]",
-    "enabled = false",
+    "[hosts.codex.roles.generator]",
+    "Terra is never selected automatically",
   ]],
   ["plugins/harness/commands/harness.md", [
     "Lineage Dispatches",
@@ -128,6 +125,28 @@ const REQUIRED = [
   ]],
 ];
 
+const FORBIDDEN = [
+  ["plugins/harness/skills/harness-loop/SKILL.md", [
+    "harness_luna_worker",
+    "provision-codex-agent.mjs",
+  ]],
+  ["plugins/harness/templates/CLAUDE.md", [
+    "harness_luna_worker",
+    "provision-codex-agent.mjs",
+  ]],
+  ["plugins/harness/templates/AGENTS.md", [
+    "harness_luna_worker",
+    "provision-codex-agent.mjs",
+  ]],
+  ["plugins/harness/templates/docs/harness-guidance.md", [
+    "harness_luna_worker",
+    "provision-codex-agent.mjs",
+  ]],
+  ["plugins/harness/templates/.harness/config.toml", [
+    "[hosts.codex.custom_agents]",
+  ]],
+];
+
 function validateLoopRules(repoRoot) {
   const completed = [];
   for (const [relativePath, needles] of REQUIRED) {
@@ -144,6 +163,15 @@ function validateLoopRules(repoRoot) {
       }
     }
     completed.push(relativePath);
+  }
+  for (const [relativePath, needles] of FORBIDDEN) {
+    const file = resolve(repoRoot, relativePath);
+    const source = readFileSync(file, "utf8");
+    for (const needle of needles) {
+      if (source.includes(needle)) {
+        throw new Error(`${relativePath}: obsolete custom-agent vocabulary remains ${JSON.stringify(needle)}`);
+      }
+    }
   }
   return completed;
 }
