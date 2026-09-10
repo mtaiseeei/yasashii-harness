@@ -56,16 +56,10 @@ argument-hint: <作りたいもの> | init | check
 4. **Step 1（企画）から開始**：
    - 引数が与えられていれば、それを Planner に渡す。
    - 引数が空なら、ユーザーに「何を作りたいか」を一言で尋ねてから始める。
-   - Planner はまずユーザーが決めるべき重要判断を最大3つの選択式質問にする。
-   - Claude Code では `AskUserQuestion` が使える場合、それを明示的に使う。
-   - Codex では選択式ユーザー入力 UI（例: `request_user_input`）が使える場合、それを明示的に使う。
-   - 回答を Planner に戻し、Planner は回答内容を解釈して、まだプロダクト方向・成功条件・主要ユーザー体験が
-     弱ければ次の選択式質問を出す。
-   - 仕様化 readiness gate を満たすまでヒアリングを繰り返す。各ラウンドは最大3問に絞る。
-   - ユーザーが「任せる」「進めて」と明示した場合だけ、残りを Planner の前提として置く。
-   - 重要判断が固まってから `docs/spec.md`、必要な `docs/spec/*.md`（`rubric.md` を含む）、
-     初回の `docs/sprints/sprint-001.md` を生成する（brainstorm-before-build）。
-     Planner 完了後、オーケストレーターが `docs/sprints/state.md` を作成する。
+   - Planner は `agents/planner.md` のGrilling gateに従い、必要時だけ同梱grillingを使う。
+     要否・範囲の相談や子roleからの質問は `harness-loop` のStep 1に従って中継する。
+   - 合意内容を `docs/spec.md`、必要な `docs/spec/*.md`（`rubric.md` を含む）、対象のSprint契約へ反映する。
+     Planner 完了後、オーケストレーターが `docs/sprints/state.md` を作成/更新する。
    - 追加調整が既存スプリントの範囲外なら、小数IDではなく `sprint-NNN-patch-PPP.md` を自動採番する。
      条件を満たす軽微変更は `Type: micro` にする（`harness-loop` の分類規則参照）。
 

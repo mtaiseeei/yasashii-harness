@@ -1,7 +1,7 @@
 # Spec Index
 
-Agentic Harness 0.5.2以降のCodex model routingを、nativeなbuilt-in/default Agentへの
-direct dispatchへ一本化する保守変更の正本インデックス。
+Agentic Harnessの保守変更の正本インデックス。Sprint 001はCodex model routingの
+native direct dispatchへの一本化、Patch 001はPlannerによる必要時のgrilling利用を扱う。
 
 ## 必読
 
@@ -13,3 +13,7 @@ direct dispatchへ一本化する保守変更の正本インデックス。
 ## 実行契約
 
 - [Sprint 001](sprints/sprint-001.md) — native Luna direct dispatchへの一本化
+- [Sprint 001 Patch 001](sprints/sprint-001-patch-001.md) — Plannerが必要性を判断してgrillingを利用する
+
+Patch 001の振る舞い・対象外・受け入れ基準は上記Patch契約を正本とし、採点にはrubricの
+Patch専用節を使う。Sprint 001の過去の契約・採点基準は変更しない。

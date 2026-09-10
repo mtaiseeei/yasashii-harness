@@ -52,7 +52,7 @@ description: 短い新規アイデア、まとまった機能開発、既存Harn
 
 | role | 対応ホストでの実行主体 | 仕事 | 書き込む正本 |
 |---|---|---|---|
-| 企画 | `planner` | 短い指示 → 選択式ヒアリング → 正本インデックス、詳細仕様、採点 rubric、スプリント契約。「何を作るか」だけ | `docs/spec.md`, `docs/spec/*.md`, `docs/sprints/sprint-*.md` |
+| 企画 | `planner` | 短い指示 → 必要性判断と必要時のgrilling → 正本インデックス、詳細仕様、採点 rubric、スプリント契約。「何を作るか」だけ | `docs/spec.md`, `docs/spec/*.md`, `docs/sprints/sprint-*.md` |
 | 実装 | `generator` | 1スプリント＝1機能ずつ実装＋自己評価＋回帰チェックの資産化。範囲外追加は勝手に混ぜず Patch Sprint へ回す | `docs/progress/sprint-*.md` |
 | 検証 | `evaluator` | 利用可能なブラウザ検証面で実際に操作してテスト、rubric の閾値で合否。合格には証跡必須 | `docs/feedback/sprint-*.md` |
 

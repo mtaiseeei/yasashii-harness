@@ -43,12 +43,12 @@ the mistake propagates into Generator and Evaluator.
 
 Generator owns how to implement the sprint.
 
-Before writing the full spec, Planner must identify the small number of product decisions the user should own and ask them as structured multiple-choice questions. Claude Code should use `AskUserQuestion` when available. Codex should use its structured user input UI when available. If neither exists, ask concise numbered choices in chat. This keeps the product direction user-owned while keeping implementation details delegated to Generator.
-
-The loop continues until the target user, core experience, success state, scope boundaries, and experience direction are clear.
-If the user explicitly asks the agent to decide, remaining cross-cutting uncertainty becomes a written assumption in
-`docs/spec/product.md` or `docs/spec/constraints.md`; sprint-specific uncertainty goes in the target
-`docs/sprints/sprint-*.md`.
+Planner uses the [Grilling gate](../plugins/harness/agents/planner.md#grilling-gate) to decide whether a request
+needs deep questioning, an isolated clarification, or no interview. The separately bundled
+[grilling Skill](../plugins/harness/skills/grilling/SKILL.md) preserves Matt Pocock's interview body and license,
+with a thin adapter for host question UI, delegated decisions, and available tools.
+Planner owns the unresolved scope and canonical destinations. Doubt about skipping or scope authority goes to the
+orchestrator for context checks or user-question relay, not for inventing user decisions. There is no separate Griller role.
 
 ### Persist Handoffs In Files
 

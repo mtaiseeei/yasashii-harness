@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-// Thin presence check for the proportional-verification loop vocabulary.
+// Thin presence check for the proportional-verification loop vocabulary, plus packaged Skill integrity.
 // It only asserts that the guard rules keep existing in the distributed
 // surfaces; it deliberately does not interpret or execute them.
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -98,7 +99,7 @@ const REQUIRED = [
     "max_lineage_dispatches",
     "max_spec_issue_returns",
     "[hosts.codex.roles.generator]",
-    "Terra is never selected automatically",
+    "Automatic routing uses configured role values or host defaults",
   ]],
   ["plugins/harness/commands/harness.md", [
     "Lineage Dispatches",
@@ -147,7 +148,37 @@ const FORBIDDEN = [
   ]],
 ];
 
+// Pinned upstream content and local links must survive plugin packaging. This checks
+// integrity, not the model's interview behavior (which needs independent role evaluation).
+function validateGrillingPackage(repoRoot) {
+  const pluginRoot = resolve(repoRoot, "plugins/harness");
+  const skillPath = resolve(pluginRoot, "skills/grilling/SKILL.md");
+  const skill = readFileSync(skillPath, "utf8").replace(/\r\n/g, "\n");
+  const body = skill.match(/<!-- upstream-body:start -->\n([\s\S]*?)<!-- upstream-body:end -->/);
+  const digest = (value) => createHash("sha256").update(value.toString().replace(/\r\n/g, "\n")).digest("hex");
+  if (!body || digest(body[1]) !== "e3ff41d7514da8ddec35e322176761a68055c4bf074f489a0e6e392a40bfd8ba") {
+    throw new Error("grilling: upstream interview body differs from pinned revision 3cca18b368ae95cdbdebbff572ccafa662551015");
+  }
+  if (digest(readFileSync(resolve(pluginRoot, "skills/grilling/LICENSE"))) !== "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5") {
+    throw new Error("grilling: pinned upstream license is missing or modified");
+  }
+  const manifest = JSON.parse(readFileSync(resolve(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
+  if (resolve(pluginRoot, manifest.skills, "grilling/SKILL.md") !== skillPath) {
+    throw new Error("grilling: Codex skill discovery does not include the bundled skill");
+  }
+  for (const relativePath of ["agents/planner.md", "skills/grilling/SKILL.md", "skills/harness-loop/SKILL.md"]) {
+    const file = resolve(pluginRoot, relativePath);
+    const source = readFileSync(file, "utf8");
+    for (const [, target] of source.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+      if (target.startsWith("https:")) continue;
+      if (!target.includes("grilling/SKILL.md") && !target.includes("agents/planner.md") && target !== "LICENSE") continue;
+      readFileSync(resolve(dirname(file), target.split("#")[0]));
+    }
+  }
+}
+
 function validateLoopRules(repoRoot) {
+  validateGrillingPackage(repoRoot);
   const completed = [];
   for (const [relativePath, needles] of REQUIRED) {
     const file = resolve(repoRoot, relativePath);

@@ -15,7 +15,7 @@ For substantial app, site, tool, or multi-step feature work, use Agentic Harness
   `docs/spec.md` as a short index, `docs/spec/*.md` for cross-sprint product details (including the
   scoring rubric `docs/spec/rubric.md`), and `docs/sprints/sprint-NNN.md` or
   `docs/sprints/sprint-NNN-patch-PPP.md` for sprint contracts.
-- Planner asks the user to choose major product direction with short multiple-choice questions before writing the full spec.
+- Planner follows the plugin's `agents/planner.md` Grilling gate, using bundled grilling when needed and consulting the orchestrator when skipping or scope authority is doubtful; the same applies without subagents.
 - Generator writes the matching `docs/progress/sprint-*.md`, implements one sprint at a time, and grows
   an automated regression suite that protects accepted acceptance criteria.
 - Evaluator writes the matching `docs/feedback/sprint-*.md` after operating the real app. A pass requires
