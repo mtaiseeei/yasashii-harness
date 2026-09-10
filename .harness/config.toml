@@ -1,15 +1,14 @@
 # ============================================================
-# SETTINGS / 設定値
+# SETTINGS
 # ============================================================
 
-# EN: Allowed value: 1. / JA: 設定可能値は1です。
+# Allowed value: 1.
 version = 1
 
-# EN: Allowed values: "balanced" or "fresh". / JA: "balanced"または"fresh"。
+# Allowed values: "balanced" or "fresh".
 lifecycle = "balanced"
 
-# EN: Claude Code roles inherit the current host model and effort by default.
-# JA: Claude Codeの各roleは既定で現在のhost model / effortを継承します。
+# Claude Code roles inherit the current host model and effort by default.
 [hosts.claudeCode.roles.planner]
 model = "inherit"
 effort = "inherit"
@@ -22,11 +21,9 @@ effort = "inherit"
 model = "inherit"
 effort = "inherit"
 
-# EN: Codex roles inherit the current host model and effort by default.
-# JA: Codexの各roleも既定で現在のhost model / effortを継承します。
+# Codex roles inherit the current host model and effort by default.
 [hosts.codex.custom_agents]
-# EN: Opt in to the global harness_luna_worker path when a role resolves to exactly gpt-5.6-luna.
-# JA: roleが正確にgpt-5.6-lunaへ解決された場合にglobal harness_luna_worker経路を使う明示スイッチです。
+# Deprecated compatibility setting; ignored regardless of value.
 enabled = false
 
 [hosts.codex.roles.planner]
@@ -37,80 +34,53 @@ effort = "inherit"
 model = "inherit"
 effort = "inherit"
 
-# EN: Generator escalation keeps the host model and effort unless explicitly overridden.
-# JA: Generator昇格時も、明示的に変更しない限りhost model / effortを継承します。
+# Generator escalation keeps the host model and effort unless explicitly overridden.
 [hosts.codex.roles.generator.escalation]
 model = "inherit"
 effort = "inherit"
 after_failures = 2
 on_evaluator_recommendation = true
 
-# EN: Codex Evaluator performs evidence-backed evaluation and self-review; it never implements fixes.
-# JA: Codex Evaluatorは証拠付き評価と自己レビューを行い、実装修正は行いません。
+# Codex Evaluator performs evidence-backed evaluation and self-review; it never implements fixes.
 [hosts.codex.roles.evaluator]
 model = "inherit"
 effort = "inherit"
 
-# EN: Loop-stop limits. When a limit is reached, the orchestrator stops and asks the user instead of dispatching again.
-# JA: ループ停止の上限です。到達したらオーケストレーターは追加dispatchせずユーザーへ確認します。
+# Loop-stop limits. At either limit, stop dispatching and ask the user.
 [limits]
-# EN: Cumulative Generator/Evaluator dispatches per base-sprint lineage (retries, spec-issue returns, and patches included). Integer 1-99.
-# JA: Base Sprint系譜（retry、spec-issue差し戻し、patchを含む）の累積dispatch数の上限です。1〜99の整数。
+# Generator/Evaluator dispatches per base-sprint lineage, including retries, spec-issue returns, and patches. Integer 1-99.
 max_lineage_dispatches = 10
-# EN: When Spec-Issue Count on one sprint reaches this value, the orchestrator stops the Planner round trip and reports to the user. Integer 1-99.
-# JA: 同一SprintのSpec-Issue Countがこの値に達したら、Plannerとの往復を続けずユーザーへ報告します。1〜99の整数。
+# Spec-Issue Count limit for one sprint; stop the Planner round trip when reached. Integer 1-99.
 max_spec_issue_returns = 2
 
 
 # ============================================================
-# REFERENCE / 設定方法・動作説明
+# REFERENCE
 # ============================================================
 
-# EN: This shared file expresses repository runtime intent. Put personal leaf-only overrides in the
-# EN: git-ignored .harness/config.local.toml. Resolution order is personal, shared, then plugin default.
-# JA: この共有ファイルはrepoのruntime方針を表します。個人差分はgit管理外の
-# JA: .harness/config.local.tomlへ必要なleafだけ書きます。優先順は個人、共有、plugin既定です。
+# This shared file expresses repository runtime intent. Put personal leaf-only overrides in the
+# git-ignored .harness/config.local.toml. Resolution order is personal, shared, then plugin default.
 
-# EN: AI editing contract: when the user asks an AI agent to change model or effort, it must consult the
-# EN: current official reference for that host below and copy the exact supported model ID, alias, and effort.
-# EN: Never guess, fuzzy-match, translate between hosts, or replace a requested value with a similar name.
-# EN: If the exact value cannot be confirmed, preserve the current value (or use "inherit" for a new leaf)
-# EN: and report that it was not changed. Documentation confirms spelling, not access on the current host.
-# JA: AI編集規則: AIエージェントがmodelまたはeffortの変更を依頼された場合、下記の該当hostの
-# JA: 最新公式資料を実際に確認し、正式なmodel ID、alias、effortをそのまま使います。
-# JA: 推測、曖昧一致、host間の名前変換、似た名前への置換は行いません。正確な値を確認できない場合は
-# JA: 現在値を維持し（新しいleafなら"inherit"を使い）、変更しなかったことを報告します。
+# AI editing contract: when the user asks an AI agent to change model or effort, it must consult the
+# current official reference for that host below and copy the exact supported model ID, alias, and effort.
+# Never guess, fuzzy-match, translate between hosts, or replace a requested value with a similar name.
+# If the exact value cannot be confirmed, preserve the current value (or use "inherit" for a new leaf)
+# and report that it was not changed. Documentation confirms spelling, not access on the current host.
 
-# EN: "inherit" sends no role override. The role uses the parent main session (the current chat) or host default.
-# JA: "inherit"はrole別overrideを渡さず、親の本チャットまたはhost既定を使います。
-# EN: The Orchestrator is the current main chat; this file cannot change that chat's model.
-# JA: オーケストレーターは現在の本チャットであり、このファイルから本チャットのmodelは変更できません。
+# "inherit" sends no role override. The role uses the parent main session (the current chat) or host default.
+# The Orchestrator is the current main chat; this file cannot change that chat's model.
 
-# EN: "balanced" reuses a role only when host metadata verifies model/effort-preserving resume.
-# EN: "fresh" starts new Generator and Evaluator work units at a Sprint boundary. The roles remain separate.
-# JA: "balanced"はmodel / effortを保つresumeをhost metadataで確認できた場合だけroleを再利用します。
-# JA: "fresh"はSprint境界でGeneratorとEvaluatorを新しくします。両roleは常に分離します。
+# "balanced" reuses a role only when host metadata verifies model/effort-preserving resume.
+# "fresh" starts new Generator and Evaluator work units at a Sprint boundary. The roles remain separate.
 
-# EN: All distributed Codex role leaves inherit by default. Explicit shared, personal, or user settings
-# EN: still use the standard/strong routing rules. Terra is never selected automatically.
-# JA: 配布時のCodex各roleはすべてinheritです。共有設定、個人設定、またはユーザー指定で明示した値には、
-# JA: 引き続きstandard / strongのrouting規則を適用します。Terraは自動選択しません。
+# All distributed Codex role leaves inherit by default. Explicit settings use the standard/strong routing rules.
+# Automatic routing uses configured role values or host defaults; it does not invent model choices.
 
-# EN: custom_agents.enabled controls only the application path. When true, an exact Luna role uses
-# EN: harness_luna_worker without a model override, passes only the resolved effort, and always starts fresh.
-# EN: The global definition is never created by the resolver; provisioning requires explicit approval.
-# JA: custom_agents.enabledは起動経路だけを切り替えます。trueかつLunaのroleはmodelを重ねて渡さず、
-# JA: 解決済みeffortだけを渡して毎回freshに起動します。resolverはglobal定義を作成せず、作成には明示承認が必要です。
+# A displayed Codex spawn schema may omit model and effort even when the runtime parser accepts them.
+# Try the resolver's exact dispatch-attempt values once on the built-in/default role, passing model and reasoning_effort directly.
+# Resolver output is not launch proof; launch-verified requires matching child host metadata or a host trace.
 
-# EN: A displayed Codex spawn schema may omit model, effort, and agent_type even when the runtime parser
-# EN: accepts them. Try the resolver's exact dispatch-attempt values once on the actual role. Use agent_type,
-# EN: never agent_role, for a custom agent. Resolver output is not launch proof; launch-verified requires
-# EN: matching child host metadata or a host trace. This applies to every exact model/effort, not only Luna/Sol.
-# JA: Codexの公開spawn schemaにmodel、effort、agent_typeが無くてもruntime parserが受理する場合があります。
-# JA: resolverの正確なdispatch-attempt値を実roleで1回試し、custom agentにはagent_typeを使います。
-# JA: resolver出力だけは実起動の証拠ではなく、launch-verifiedには一致するchild metadata等が必要です。
-
-# Official references / 公式リファレンス:
+# Official references:
 # OpenAI API model IDs and capabilities: https://developers.openai.com/api/docs/models
 # Codex model availability: https://developers.openai.com/codex/models
 # Codex model/effort configuration: https://developers.openai.com/codex/config-reference

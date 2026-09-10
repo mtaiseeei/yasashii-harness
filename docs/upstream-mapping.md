@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `2579d715d13beef7767cc30c3eb10af607ecd932` (Agentic Harness v0.5.3, native Luna direct dispatch)
+- Current synchronized base: `37ee21232d0853235eff1d0c5c14fba2bfde6aa3` (Agentic Harness v0.5.4, conditional grilling and English configuration comments)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -45,11 +45,14 @@ CLAUDE.md
 LICENSE
 README.md
 docs/KNOWLEDGE.md
+docs/feedback/sprint-001-patch-001.md
 docs/feedback/sprint-001.md
 docs/harness-guidance.md
+docs/progress/sprint-001-patch-001.md
 docs/progress/sprint-001.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
+docs/releases/v0.5.4-validation.md
 docs/spec.md
 docs/spec/constraints.md
 docs/spec/domain.md
@@ -57,6 +60,7 @@ docs/spec/features.md
 docs/spec/product.md
 docs/spec/rubric.md
 docs/spec/ui.md
+docs/sprints/sprint-001-patch-001.md
 docs/sprints/sprint-001.md
 docs/sprints/state.md
 plugins/harness/.claude-plugin/plugin.json
@@ -74,6 +78,8 @@ plugins/harness/scripts/init-guidance.sh
 plugins/harness/scripts/node-guidance-initializer.mjs
 plugins/harness/scripts/platform-permissions.mjs
 plugins/harness/scripts/resolve-runtime-config.mjs
+plugins/harness/skills/grilling/LICENSE
+plugins/harness/skills/grilling/SKILL.md
 plugins/harness/skills/harness-loop/SKILL.md
 plugins/harness/skills/using-harness/SKILL.md
 plugins/harness/templates/.harness/.gitignore
@@ -104,3 +110,9 @@ scripts/check-windows-init.mjs
   Luna→設定済みstrong Sol→`inherit`、Terra非選択を利用者向けに短く反映した。
 - downstream-owned `scripts/check-positioning.mjs` はYasashii配布識別を守りながら、0.5.3のversionとrouting説明も回帰対象にする。
 - 上流Sprintのspec、progress、feedback、stateは上流treeの一部としてbytesを保持し、Yasashii側の別Sprintとして再解釈しない。
+
+## v0.5.4 同期メモ
+
+- 条件付きgrilling Skill・原文・MITライセンス、英語のみのモデル名に依存しない設定説明を同期した。設定値は保持する。
+- やさしいPlanner追加節の固定3問を撤去し、上流の必要性判断と深掘りへ接続した。平易な日本語での対話を維持する。
+- downstream所有のREADME・positioning検査を確認し、0.5.4の説明とversion確認へ反映した。

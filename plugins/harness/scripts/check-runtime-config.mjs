@@ -189,9 +189,13 @@ check("shared TOML separates settings from reference and requires exact official
   const template = path.join(pluginRoot, "templates/.harness/config.toml");
   const source = fs.readFileSync(template, "utf8");
   const config = parseToml(source);
-  const settingsIndex = source.indexOf("# SETTINGS / 設定値");
+  const comments = source.split(/\r?\n/).filter((line) => /^\s*#/.test(line)).join("\n");
+  assert.doesNotMatch(comments, /[^\x00-\x7f]/, "configuration comments must be English-only");
+  assert.doesNotMatch(comments, /#\s*(?:EN|JA):|\b(?:gpt-[\w.-]+|claude-[\w.-]+|Luna|Sol|Terra|Astra|Sonnet|Opus|Haiku)\b/i);
+  assert.deepEqual(parseToml(source.split(/\r?\n/).filter((line) => !/^\s*#/.test(line)).join("\n")), config);
+  const settingsIndex = source.indexOf("# SETTINGS");
   const firstValueIndex = source.indexOf("version = 1");
-  const referenceIndex = source.indexOf("# REFERENCE / 設定方法・動作説明");
+  const referenceIndex = source.indexOf("# REFERENCE");
   const evaluatorIndex = source.indexOf("[hosts.codex.roles.evaluator]");
   const lastValueIndex = source.indexOf('effort = "inherit"', evaluatorIndex);
   assert.ok(settingsIndex >= 0 && settingsIndex < firstValueIndex);
@@ -201,23 +205,14 @@ check("shared TOML separates settings from reference and requires exact official
   assert.match(source, /current chat/i);
   assert.match(source, /Never guess, fuzzy-match, translate between hosts/i);
   assert.match(source, /AI editing contract.*consult the[\s\S]{0,120}current official reference/i);
-  assert.match(source, /AI編集規則.*最新公式資料を実際に確認/is);
   assert.match(source, /exact value cannot be confirmed, preserve the current value/i);
   assert.match(source, /Allowed values: "balanced" or "fresh"/i);
   assert.match(source, /"balanced" reuses a role only when host metadata verifies model\/effort-preserving resume/i);
   assert.match(source, /"fresh" starts new Generator and Evaluator work units/i);
   assert.match(source, /(?:Orchestrator|オーケストレーター).*(?:cannot|does not|not|変更できない).*model/i);
   assert.match(source, /distributed Codex role leaves inherit by default/i);
-  assert.match(source, /Terra.*(?:never|not|do not|自動選択しません)/i);
   assert.match(source, /displayed.*schema.*omit.*runtime parser.*accept/is);
   assert.match(source, /built-in\/default role.*model and reasoning_effort directly/is);
-  assert.match(source, /every exact model\/effort, not only Luna\/Sol/is);
-  assert.match(source, /# EN:.*Planner/is);
-  assert.match(source, /# JA:.*Planner/is);
-  assert.match(source, /# EN:.*Generator/is);
-  assert.match(source, /# JA:.*Generator/is);
-  assert.match(source, /# EN:.*Evaluator/is);
-  assert.match(source, /# JA:.*Evaluator/is);
   assert.equal(config.lifecycle, "balanced");
   assert.deepEqual(config.hosts.codex.roles.planner, {
     model: "inherit",
@@ -374,7 +369,6 @@ check("generated guidance preserves native direct dispatch and hidden-schema rul
     assert.match(source, /schema omission alone must not force an explicitly configured value back to `inherit`/i);
     assert.match(source, /resolver's exact `dispatch-attempt` values/i);
     assert.match(source, /built-in\/default Agent.*model.*reasoning_effort/is);
-    assert.match(source, /every exact model\/effort.*including explicit Luna\/Sol settings/is);
     assert.match(source, /`unknown field` rejection.*application path is unavailable/is);
     assert.match(source, /child host metadata matches the dispatched values/is);
   }
@@ -2053,7 +2047,7 @@ check("loop-stop limits resolve with defaults, overrides, and safe fallbacks", (
   assert.match(template, /\[limits\]/);
   assert.match(template, /max_lineage_dispatches = 10/);
   assert.match(template, /max_spec_issue_returns = 2/);
-  assert.ok(template.indexOf("[limits]") < template.indexOf("# REFERENCE / 設定方法・動作説明"));
+  assert.ok(template.indexOf("[limits]") < template.indexOf("# REFERENCE"));
 
   const root = fixture();
   writeToml(path.join(root, ".harness/config.toml"), {

@@ -237,9 +237,8 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   非推奨path、無視したこと、実効経路がnative direct dispatchであることをwarningへ出す。
   既存設定やAgent定義を削除する必要はなく、新規configにはこのtableを生成しない。
 - TOMLが無く旧JSONだけがある場合は互換読込して移行warningを出す。TOMLがあれば旧JSONはmergeしない。
-- plugin既定は `lifecycle: balanced`。Claude Codeは全roleで `model: inherit` / `effort: inherit`。
-  CodexはPlanner=`gpt-5.6-sol`/`high`、Generator=`gpt-5.6-luna`/`xhigh`、
-  Evaluator=`gpt-5.6-sol`/`high`。Generatorのstrong経路は`gpt-5.6-sol`/`high`。
+- plugin既定は `lifecycle: balanced`。両hostの全roleとGeneratorのstrong経路は
+  `model: inherit` / `effort: inherit`。明示設定がある場合だけ、その正確な値を適用する。
 - `--event` は初回 `initial`、新Sprintへの遷移 `sprint-change`、同一Sprintの不合格修正 `retry`。
 - `--current-model-tier`には、resolver呼出し前にstate.mdから読んだ現在の`Model Tier`を必ず渡す。
   旧stateに項目が無い場合だけ`unknown`を渡す。引数を省略した場合もresolverは安全側の`unknown`として扱う。
@@ -312,8 +311,9 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - resolverの`hosts.codex.roles.<role>.dispatch`を実際の起動契約として使う。`mode`は`direct`であり、
   `modelOverride`と`reasoningEffort`を正確に渡す。`status: blocked`ではdispatchしない。
 - 既存の `AGENTS.md`、`CLAUDE.md`、`.claude/agents/`、`.codex/agents/`、既存設定は一切上書きしない。
-- Codexの通常GeneratorはLuna/xhigh。Lunaが利用不能ならstrongのSol/highを試し、Solも利用不能なら
-  model / effortを`inherit`へ戻してwarningを出す。Terraは通常・昇格・availability fallbackの候補にしない。
+- CodexのGeneratorは設定済みstandard値を使う。起動前にmodelが拒否された場合はresolverの
+  availability fallback契約に従い、対象のstrong設定、さらに`inherit`へ進みwarningを出す。
+  未設定のmodelを独自に候補へ加えない。
 - **2026-07-20 CLI実起動基準 / 2026-08-17 App追加確認**: Codex CLIではSol/highの親からnative `spawn_agent`へ
   `fork_turns: "none"`、`model: "gpt-5.6-luna"`、`reasoning_effort: "xhigh"`を渡し、子metadataでも
   Luna/xhighを確認済み。CLI `0.144.6`では公開schemaに両引数が無くてもruntime parserが受理した。
@@ -326,14 +326,14 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - Codex Appの完了済みAgentへのfollow-upではSol/highおよびTerra/xhighが次turnでSol/lowになった。
   CLIを含めresume後のmodel / effort保持をhost metadataで確認できるまでは、指定routingが必要なroleを
   resumeせず、正本ファイルを読み直すfreshなnon-full-history spawnを使う。
-- Orchestratorは本チャットでありruntime configからmodelを変更できない。Codexでは本チャットを
-  Sol/medium、高リスク時はSol/highで開始することを推奨するだけで、適用済みとは表示しない。
+- Orchestratorは本チャットでありruntime configからmodelを変更できない。本チャットのmodel / effortは
+  ユーザーまたはhostの選択に従い、この設定から適用済みとは表示しない。
 
 #### Generator model routing
 
-- `standard`: 通常の初回実装と1回目の`implementation-issue`。Luna/xhighを使う。
+- `standard`: 通常の初回実装と1回目の`implementation-issue`。設定済みstandard model / effortを使う。
 - `strong`: 高リスクSprint、Retry Countが2に達した`implementation-issue`、またはEvaluatorの
-  `Escalation Recommendation: strong`をオーケストレーターが証拠確認済みとして採用した場合。Sol/highを使う。
+  `Escalation Recommendation: strong`をオーケストレーターが証拠確認済みとして採用した場合。設定済みstrong model / effortを使う。
 - 高リスクとは、認証・認可、セキュリティ、個人情報、DB migration、データ破壊、本番・課金・外部書込み、
   複数領域の戻しにくい設計変更、またはユーザーが品質優先を明示したSprintを指す。
 - 推薦だけではstate.mdを変更しない。オーケストレーターがfeedbackの具体的証拠を確認し、採用してから更新する。
@@ -358,30 +358,14 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
   GeneratorとEvaluatorの分離、および1作業単位1roleの原則は変えない。
 
 ### Step 1: 企画（Planner を dispatch）
-- ユーザーの短いプロンプトを Planner に渡す。
-- Planner はいきなり `docs/spec.md` を完成させず、まずユーザーが決めるべき重要判断を
-  最大3つの選択式質問にする。
-- Claude Code では `AskUserQuestion` が使える場合、それを明示的に使う。
-- Codex では選択式ユーザー入力 UI（例: `request_user_input`）が使える場合、それを明示的に使う。
-- どちらも使えない場合は、通常メッセージで短い番号付き選択肢として質問する。
-- 回答を Planner に戻し、Planner は回答内容を解釈して、まだプロダクト方向・成功条件・主要ユーザー体験が
-  弱ければ、次の選択式質問を出す。
-- 仕様化 readiness gate を満たすまで、このヒアリングを繰り返す。各ラウンドは最大3問に絞る。
-- ユーザーが「任せる」「進めて」と明示した場合だけ、残りを Planner の前提として置く。
-- 重要判断が固まってから、Planner に `docs/spec.md`、必要な `docs/spec/*.md`（`rubric.md` を含む）、
-  初回の `docs/sprints/sprint-001.md` を生成させる。最初のヒアリングを省略しない。
-- Planner の完了後、オーケストレーターが state.md を作成/更新する
+- ユーザーの依頼と既決事項をPlannerへ渡し、[PlannerのGrilling gate](../../agents/planner.md#grilling-gate)
+  に従わせる。必要性判断とSkill呼び出しはこの定義を正本とし、no-subagent fallbackでも同じ節を読む。
+- Plannerから要否・範囲の相談が来たら、未決事項と推奨案を確認し、既存承認を確かめるか
+  ユーザーへの質問を中継する。子roleが質問UIを使えない場合も質問と回答を中継する。
+  オーケストレーターがユーザーの意思を代行せず、全件のSkill呼び出しを承認待ちにしない。
+- Plannerが合意内容を `docs/spec.md`、必要な `docs/spec/*.md`（`rubric.md` を含む）、
+  対象のSprint契約へ反映してから、オーケストレーターが state.md を作成/更新する
   （初回は `Current ID: sprint-001`、`Status: planned`）。
-- 軽微な曖昧さは Planner が前提を置き、横断前提は `docs/spec/product.md` または
-  `docs/spec/constraints.md`、スプリント固有前提は対象の `docs/sprints/sprint-*.md` に明記する。
-  （brainstorm-before-build：作る前に設計を合意する）。
-
-仕様化 readiness gate：
-- ターゲットユーザーが明確。
-- 最初に強く作り込む主要体験が明確。
-- 成功状態・受け入れ基準の方向性が明確。
-- スコープ外が明確。
-- デザインや体験の方向性に明確な意図がある。
 
 ### Step 2: 実装（Generator を dispatch）
 - resolverの`routing.nextRole`、Generatorの`routing.modelTier` / `reason` / `rotateReason`、lifecycle actionを確認する。
@@ -406,9 +390,9 @@ node "$PLUGIN_ROOT/scripts/resolve-runtime-config.mjs" --root "$(pwd)" --host co
 - 解決済みruntime設定のGenerator用model / effort / lifecycle actionを、ホストが受け付けるdispatch項目にだけ渡す。
   Agentへは設定値を再解釈させず、正本ファイルのpathと対象Sprintだけを渡す。
 - high-risk Sprint、2回目の連続`implementation-issue`、証拠付きEvaluator推薦ではresolverが最初からstrongを
-  選ぶため、Lunaの試行を挟まずSol/highをdispatchする。起動試行はモデル選択後に行い、昇格規則を上書きしない。
+  選ぶため、standardの試行を挟まず設定済みstrong値をdispatchする。起動試行はモデル選択後に行い、昇格規則を上書きしない。
 - strong判定はdispatch前に適用する。strong Generatorも`dispatch.mode`は`direct`であり、
-  configured Sol/highをbuilt-in/default Agentへ渡してfresh dispatchする。
+  設定済みstrong model / effortをbuilt-in/default Agentへ渡してfresh dispatchする。
 - 完了後、対象の `docs/progress/sprint-*.md` に自己評価と引き渡し事項（起動方法・URL・テストシナリオ・
   回帰チェックの実行コマンド）が書かれていることを確認し、Status を `awaiting-eval` にする。
 - 前スプリントの不合格フィードバックがあれば、Generator はそれを先に直す。
@@ -442,7 +426,7 @@ feedback の判定に応じて、オーケストレーターが必ず state.md �
 - **不合格（implementation-issue）** → Retry Count を +1してstate.mdへ記録する。1回目はstandardの
   tierを維持し、`resume: true`の実証がある場合だけGeneratorをresumeする。未実証なら同じtierのfresh Agentを使う。
   2回目はModel Tierを`strong`、Rotateを`model-escalation`へ更新してから、
-  古いLuna GeneratorをresumeせずfreshなSol GeneratorでStep 2へ戻す。
+  古いstandard Generatorをresumeせずfreshなstrong GeneratorでStep 2へ戻す。
 - **不合格（spec-issue）** → feedback が「仕様自体の欠陥」と分類した場合は Generator に差し戻さない。
   Retry CountとModel Tierを消費せず、Spec-Issue Count を +1 して state.md へ記録し、Planner に feedback を
   渡して契約・仕様の修正を依頼する。修正後は Step 2 へ直行せず、契約・rubric の差分（特に受け入れ基準・
@@ -562,7 +546,7 @@ Generator の自己申告は従来どおり証跡にならない。
 5. **起動手順を必ず記載する** — Generator は対象の `docs/progress/sprint-*.md` に起動コマンドと
    回帰チェックの実行コマンドを毎回明記し、Evaluator はそれに従って起動する。
 6. **作る前に合意する** — まとまった開発では、Planner の仕様をユーザーが確認してから実装に入る。
-   ユーザーが決めるべき重要判断は、選択式ヒアリングで確認してから仕様化する。最初のヒアリングを省略しない。
+   ヒアリングの要否はPlannerのGrilling gateに従い、未決の重要判断を推測で埋めない。
 7. **完了前に検証する** — 「実装したから完了」にしない。Evaluator が実際に動かして証跡付きで
    確かめるまでスプリントは完了扱いにしない（verification-before-completion）。
    例外は、ユーザーが残余リスクを明示的に引き受ける `done-by-user-decision` だけである。
@@ -573,10 +557,10 @@ Generator の自己申告は従来どおり証跡にならない。
 
 ## サブエージェントへの dispatch 例
 
-- Planner: 「次のアイデアについて、まずユーザーが決めるべき重要判断を最大3つの選択式質問にして。
-  回答を解釈し、readiness gate を満たすまで必要な追加質問を続けてから `docs/spec.md`、
-  `docs/spec/*.md`（`rubric.md` を含む）、初回の `docs/sprints/sprint-001.md` に展開して：
-  『<ユーザーのプロンプト>』」
+- Planner: 「次の依頼と既決事項を読み、`agents/planner.md` のGrilling gateに従って必要性を判断し、
+  必要なら同梱grillingを使って。判断に迷えば未決事項と推奨案を相談して。
+  合意内容を `docs/spec.md`、必要な `docs/spec/*.md`（`rubric.md` を含む）、対象のSprint契約へ反映して：
+  『<ユーザーのプロンプトと既決事項>』」
 - Generator: 「`docs/spec.md`、必読 `docs/spec/*.md`、`docs/sprints/state.md`、
   対象の `docs/sprints/sprint-*.md` を読み、Current ID のスプリントだけを実装し、対応する
   `docs/progress/sprint-*.md` を更新して。

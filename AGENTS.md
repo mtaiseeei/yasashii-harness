@@ -7,7 +7,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 ## Core Product
 
 - `Planner` expands a short new idea or the next step in an existing repository into a short `docs/spec.md` index, detailed `docs/spec/*.md` files (including the scoring rubric `docs/spec/rubric.md`), and sprint contracts in `docs/sprints/`.
-- Planner must first ask the user to choose major product direction with short multiple-choice questions when meaningful decisions are still open.
+- Planner follows the Grilling gate in `plugins/harness/agents/planner.md`, using bundled grilling when needed and consulting the orchestrator when skipping or scope authority is doubtful.
 - `Generator` implements one sprint at a time, grows an automated regression suite protecting accepted acceptance criteria, and updates the matching `docs/progress/sprint-*.md`.
 - `Evaluator` operates the running app, scores the sprint against the rubric with recorded evidence, and writes the matching `docs/feedback/sprint-*.md`. A pass without evidence is invalid. Evidence sufficiency is bounded (safe harbor): the evidence formats listed in the rubric and contract are enough for a pass, Evaluator never invents extra evidence formats or demands new evidence-collection infrastructure, and every finding carries a target class (`product` / `verification-infra`).
 - The orchestrator (main agent) is the only writer of `docs/sprints/state.md`, the execution-state source of truth (Current ID, per-sprint status `planned/active/awaiting-eval/done/done-by-user-decision/deferred/superseded`, retry count, spec-issue count, lineage dispatch budget). Every pass/fail is recorded there before the loop moves on. An older `docs/sprints/current.md` is a legacy pointer converted once into `state.md`.
@@ -48,7 +48,7 @@ For the design background and reference trail, read `docs/KNOWLEDGE.md`.
 - Generator-authored commits are prefixed with the sprint ID. `git init` is allowed only in a brand-new project, never inside an existing repository. Acceptance tags are opt-in and off by default.
 - Do not let hooks write project guidance files. Guidance generation belongs to harness initialization, whether conversational or `/harness`, and must be no-overwrite.
 - Keep install-facing text actionable: after installing, users should know they can just ask for an app, with `/harness <idea>` as an explicit shortcut.
-- The Planner question loop is mandatory for substantial builds. Do not collapse it into assumptions unless the user explicitly asks the agent to decide.
+- Keep interview necessity in the Planner Grilling gate and interview mechanics in the bundled grilling Skill. Preserve user decisions and explicit delegation; do not invent unresolved product choices.
 - Do not hardcode Claude model names in reusable workflow files. Inherit host/user defaults unless the user opts into a stronger model.
 - Bundle required parser code and licenses inside the plugin so target repositories need no dependency installation.
 

@@ -59,10 +59,9 @@ Do not default to fixing things outside the loop. Classify every follow-up reque
 ## Planning Rules
 
 - Planner describes what the product should do, not how to implement it.
-- Planner should ask the user to decide major product direction before writing the full spec.
-- Use Codex's structured user input UI when available. Ask at most three multiple-choice questions per round, with 2-3 options and a recommended option when appropriate.
-- Continue the question loop until the target user, core experience, success state, scope boundaries, and experience direction are clear.
-- If the user explicitly says to proceed or leave it to the agent, put cross-cutting uncertainty in `docs/spec/product.md` or `docs/spec/constraints.md`, and sprint-specific uncertainty in the target `docs/sprints/sprint-*.md`.
+- Follow the plugin's `agents/planner.md` Grilling gate to decide whether interviewing is needed and use the bundled grilling Skill when it is. This also applies without subagents.
+- Planner chooses the unresolved scope and canonical destinations within the user's instructions; consult the orchestrator when skipping or scope authority is doubtful.
+- Use available host-native question UI, or concise chat questions / parent relay when unavailable. Tool batch limits are not a total interview limit.
 - Planner generates `docs/spec/rubric.md` at initialization, adjusting design/originality thresholds to the project type. Evaluator proposes rubric changes in feedback; only Planner applies them.
 - Invariants confirmed by accepted sprints ("never regress this") are promoted into `docs/spec/constraints.md`, not accumulated in state files.
 - Avoid premature stack, schema, endpoint, or component decisions in the spec files.

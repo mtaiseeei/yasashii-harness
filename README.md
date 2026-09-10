@@ -52,6 +52,12 @@ codex plugin add harness@yasashii-harness
 `init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
 `upgrade`はまだ実装していないため、上流更新はこのリポジトリの同期手順で取り込みます。
 
+### 0.5.4: 必要なときに深く聞くPlanner
+
+Plannerが依頼と既存仕様からヒアリングの必要性を判断します。重要な曖昧さや矛盾があれば同梱のgrillingを使い、明確な依頼はそのまま進めます。省略や範囲判断に迷う場合はオーケストレーターへ相談します。やさしい版でも固定3問の制限を撤去し、答えやすい日本語で対話します。
+
+Harness設定の説明は英語へ統一し、説明中の具体的なモデル名を外しました。個別の設定値は変わりません。
+
 ### 0.5.3: Lunaを追加定義なしで直接利用
 
 Codexでは、`gpt-5.6-luna`とeffortをnative `spawn_agent`のbuilt-in/default Agentへ
