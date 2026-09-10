@@ -292,7 +292,6 @@ function validatePositioning(repoRoot) {
     assert.equal(claudeManifest.version, codexManifest.version);
     assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
     assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);
-    assert.equal(claudeManifest.version, "0.5.3");
   });
 
   check("Yasashii distribution identity remains downstream-owned", () => {
