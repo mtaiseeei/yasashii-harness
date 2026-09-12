@@ -366,7 +366,9 @@ institutionalized), scoring axes are unified across Generator and Evaluator with
 return to Planner), three consecutive failures escalate to the user, Generator commits carry sprint-ID
 prefixes, and acceptance tags are opt-in.
 
-### Proportional Verification And Runaway-Verification Guards (v0.5.0)
+### Proportional Verification And Runaway-Verification Guards (v0.5.0 historical decision)
+
+This section records the original v0.5.0 rules. Current bounded-repair, semantic-correction and evidence-reuse behavior is defined in `plugins/harness/skills/harness-loop/references/scope.md` and `evaluation.md`; do not use the historical blanket escalation rules as current instructions.
 
 The second real-world run (a Harness-managed repository shipping a plugin product to four host
 surfaces, Sprint 033) exposed a runaway-verification mode. A completion candidate had already passed
@@ -535,5 +537,12 @@ agentic-harness/
 - Add Windows-compatible hook/script paths.
 - Add a tiny example project or recorded walkthrough without bloating the plugin.
 - Consider a deterministic Playwright helper for CLI evaluation.
-- Consider slimming the SessionStart hook injection (short pointer instead of the full skill text
-  for repositories without harness markers).
+- SessionStart hook slimming was completed in v0.5.5: it emits a short applicability pointer, preserving the Claude-only hook output contract.
+
+### Astra instruction audit (2026-09-12)
+
+Normal flow now lives in the short harness-loop entry; runtime, state migration, special failures, evaluation and Planner output examples are conditional references. The source of truth is the checkout, followed by downstream edition synchronization; installed caches and initialized user repositories are not overwritten.
+
+Existing verification defects may receive one bounded repair within the same Sprint without changing expected behavior, acceptance thresholds or evidence requirements, followed by independent evaluation and unchanged dispatch budgets. Planner can record semantic-preserving typo/reference corrections under existing authorization. Real scope or evidence changes still require user decisions. Micro eligibility uses impact, risk and independent verifiability rather than pre-existing automation alone. Evidence reuse identifies the evaluated candidate and dependencies; unrelated dirty work does not invalidate it.
+
+The portable release summary and update guidance are in `docs/releases/v0.5.5.md`. These are instruction improvements and static-risk corrections, not measured model performance claims. Initialization remains no-overwrite; explicitly authorized guidance maintenance may merge necessary changes while preserving existing project rules and dirty work. Runtime/model configuration and Agent definitions remain protected.

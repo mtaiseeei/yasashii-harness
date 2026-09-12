@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # SessionStart hook for the agentic-harness plugin.
-# Injects the `using-harness` skill content as additionalContext so the main
-# agent is aware of the harness from the start of every session.
+# Adds a short applicability pointer; never injects the entire Skill.
 
 set -euo pipefail
 
@@ -15,8 +14,6 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-using_harness_content=$(cat "${PLUGIN_ROOT}/skills/using-harness/SKILL.md" 2>&1 || echo "Error reading using-harness skill")
-
 # Escape a string for safe embedding inside a JSON string literal.
 escape_for_json() {
     local s="$1"
@@ -28,9 +25,9 @@ escape_for_json() {
     printf '%s' "$s"
 }
 
-content_escaped=$(escape_for_json "$using_harness_content")
-
-session_context="<IMPORTANT>\nThis project has agentic-harness available.\n\n**Below is your 'harness:using-harness' skill — the entry point for starting or continuing substantial, multi-sprint development. When the user wants to build a product, implement a substantial feature, or continue a Harness-managed repository, follow it and open the 'harness-loop' skill via the Skill tool.**\n\n${content_escaped}\n</IMPORTANT>"
+# Short applicability pointer only; the Skill is loaded conditionally by the main agent.
+session_context="Agentic Harness is available for starting or continuing substantial, multi-sprint development. To build a product, implement a substantial feature, or continue a Harness-managed repository, load harness:using-harness at ${PLUGIN_ROOT}/skills/using-harness/SKILL.md and follow its routing. Do not start the loop for ordinary questions or init/check-only requests. Role subagents continue their assigned task."
+content_escaped=$(escape_for_json "$session_context")
 
 # Claude Code reads hookSpecificOutput.additionalContext (nested).
-printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$content_escaped"

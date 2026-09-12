@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
-// Thin presence check for the proportional-verification loop vocabulary, plus packaged Skill integrity.
-// It only asserts that the guard rules keep existing in the distributed
-// surfaces; it deliberately does not interpret or execute them.
+// Check canonical rule reachability, packaged integrity and executable hook behavior.
+// Instruction choices still need independent scenario evaluation; static checks do not prove model behavior.
 
 import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, relative, isAbsolute, sep } from "node:path";
+import { toGitBashPath } from "../plugins/harness/scripts/git-bash-path.mjs";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -29,124 +31,64 @@ function parseArgs(argv) {
   return { help: false, repoRoot };
 }
 
+// Rules are checked once at their canonical owner, never copied into every adapter.
 const REQUIRED = [
-  ["plugins/harness/skills/harness-loop/SKILL.md", [
-    "verification-scope-issue",
-    "verification-infra",
-    "Spec-Issue Count",
-    "Lineage Dispatches",
-    "done-by-user-decision",
-    "証拠の十分性",
-    "厳格化ゲート",
-    "検証スコープガード",
-    "再評価の増分原則",
-    "max_lineage_dispatches",
-    "max_spec_issue_returns",
-    "旧`hosts.codex.custom_agents`設定",
-    "native direct dispatch",
-    "built-in/default Agent",
-  ]],
-  ["plugins/harness/agents/evaluator.md", [
-    "verification-scope-issue",
-    "verification-infra",
-    "証拠の十分性",
-    "対象区分",
-    "再評価の増分原則",
-  ]],
-  ["plugins/harness/agents/planner.md", [
-    "検証基盤の実装仕様を書かない",
-    "safe harbor",
-    "検証スコープ（着手時に固定）",
-    "厳格化ゲート",
-  ]],
-  ["plugins/harness/agents/generator.md", [
-    "Scope change detected",
-    "verification-infra",
-    "Lineage Dispatches",
-    "Non-scope",
-  ]],
-  ["plugins/harness/templates/CLAUDE.md", [
-    "verification-scope-issue",
-    "verification-infra",
-    "Lineage Dispatches",
-    "done-by-user-decision",
-    "safe harbor",
-    "Proportional Verification",
-    "max_lineage_dispatches",
-    "legacy `hosts.codex.custom_agents` table",
-    "native direct dispatch",
-  ]],
-  ["plugins/harness/templates/AGENTS.md", [
-    "verification-scope-issue",
-    "verification-infra",
-    "Lineage Dispatches",
-    "done-by-user-decision",
-    "safe harbor",
-    "Proportional Verification",
-    "max_lineage_dispatches",
-    "legacy `hosts.codex.custom_agents` table",
-    "native direct dispatch",
-  ]],
-  ["plugins/harness/templates/docs/harness-guidance.md", [
-    "verification-scope-issue",
-    "safe harbor",
-    "done-by-user-decision",
-    "`hosts.codex.custom_agents` table is ignored",
-    "built-in/default Agent",
-  ]],
-  ["plugins/harness/templates/.harness/config.toml", [
-    "[limits]",
-    "max_lineage_dispatches",
-    "max_spec_issue_returns",
-    "[hosts.codex.roles.generator]",
-    "Automatic routing uses configured role values or host defaults",
-  ]],
-  ["plugins/harness/commands/harness.md", [
-    "Lineage Dispatches",
-    "検証スコープガード",
-  ]],
-  ["plugins/harness/skills/using-harness/SKILL.md", [
-    "同一の機能面",
-    "Spec-Issue Count",
-    "Lineage Dispatches",
-  ]],
-  ["plugins/harness/scripts/init-guidance.sh", [
-    "Spec-Issue Count",
-    "Lineage Dispatches",
-  ]],
-  ["CLAUDE.md", [
-    "verification-scope-issue",
-    "one feature surface and one flow",
-    "done-by-user-decision",
-  ]],
-  ["AGENTS.md", [
-    "verification-scope-issue",
-    "one feature surface and one flow",
-    "done-by-user-decision",
-  ]],
+  ["plugins/harness/skills/harness-loop/SKILL.md", ["オーケストレーターのみ", "Lineage Dispatches", "limits.max_lineage_dispatches", "limits.max_spec_issue_returns", "done-by-user-decision"]],
+  ["plugins/harness/skills/harness-loop/references/scope.md", ["期待結果・合否条件・証拠要件を変えず", "独立再評価", "同一Sprintで1回", "意味不変", "Spec-Issue Count", "Lineage Dispatches", "2 回連続"]],
+  ["plugins/harness/skills/harness-loop/references/evaluation.md", ["safe harbor", "無関係なdirty", "関連変更", "依存物", "証跡の無い合格", "CLI・API・plugin"]],
+  ["plugins/harness/skills/harness-loop/references/runtime.md", ["native direct dispatch", "built-in/default Agent", "Unknown model", "unknown field", "host metadata", "resume: true"]],
+  ["plugins/harness/skills/harness-loop/references/state.md", ["runtime-migration", "unknown", "no-overwrite", "deferred", "superseded"]],
+  ["plugins/harness/agents/planner.md", ["Grilling gate", "検証基盤の実装仕様を書かない", "未決", "safe harbor"]],
+];
+const FORBIDDEN = [
+  ["plugins/harness/skills/harness-loop/SKILL.md", ["harness_luna_worker", "provision-codex-agent.mjs"]],
+  ["plugins/harness/templates/.harness/config.toml", ["[hosts.codex.custom_agents]"]],
 ];
 
-const FORBIDDEN = [
-  ["plugins/harness/skills/harness-loop/SKILL.md", [
-    "harness_luna_worker",
-    "provision-codex-agent.mjs",
-  ]],
-  ["plugins/harness/templates/CLAUDE.md", [
-    "harness_luna_worker",
-    "provision-codex-agent.mjs",
-  ]],
-  ["plugins/harness/templates/AGENTS.md", [
-    "harness_luna_worker",
-    "provision-codex-agent.mjs",
-  ]],
-  ["plugins/harness/templates/docs/harness-guidance.md", [
-    "harness_luna_worker",
-    "provision-codex-agent.mjs",
-  ]],
-  ["plugins/harness/templates/.harness/config.toml", [
-    "[hosts.codex.custom_agents]",
-  ]],
-];
+function validateReachability(repoRoot) {
+  const plugin = resolve(repoRoot, "plugins/harness");
+  const visited = new Set();
+  function visit(file) {
+    if (visited.has(file)) return;
+    const local = relative(plugin, file);
+    assert.ok(local && !isAbsolute(local) && local !== ".." && !local.startsWith(`..${sep}`), `reference escapes plugin: ${file}`);
+    visited.add(file);
+    const source = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
+    for (const [, target] of source.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+      if (/^(https?:|#)/.test(target)) continue;
+      visit(resolve(dirname(file), target.split("#")[0]));
+    }
+  }
+  visit(resolve(plugin, "skills/using-harness/SKILL.md"));
+  for (const file of ["scope.md", "evaluation.md", "runtime.md", "state.md", "planner-templates.md"]) {
+    assert.ok(visited.has(resolve(plugin, "skills/harness-loop/references", file)), `unreachable reference: ${file}`);
+  }
+  for (const file of ["templates/AGENTS.md", "templates/CLAUDE.md", "templates/docs/harness-guidance.md"]) {
+    const source = readFileSync(resolve(plugin, file), "utf8");
+    assert.ok(source.includes("skills/using-harness/SKILL.md"), `${file}: missing installed entrypoint`);
+  }
+  visit(resolve(plugin, "commands/harness.md"));
+  return visited.size;
+}
+
+function validateHook(repoRoot) {
+  const plugin = resolve(repoRoot, "plugins/harness");
+  const hook = resolve(plugin, "hooks/session-start.sh");
+  const env = { ...process.env };
+  delete env.CLAUDE_PLUGIN_ROOT;
+  const absent = spawnSync("bash", [toGitBashPath(hook)], { env, encoding: "utf8" });
+  assert.equal(absent.status, 0, absent.stderr);
+  assert.equal(absent.stdout, "");
+  const hooks = JSON.parse(readFileSync(resolve(plugin, "hooks/hooks.json"), "utf8"));
+  assert.equal(hooks.hooks.SessionStart[0].matcher, "startup|clear|compact");
+  const present = spawnSync("bash", [toGitBashPath(hook)], { env: { ...env, CLAUDE_PLUGIN_ROOT: toGitBashPath(plugin) }, encoding: "utf8" });
+  assert.equal(present.status, 0, present.stderr);
+  const payload = JSON.parse(present.stdout).hookSpecificOutput;
+  assert.equal(payload.hookEventName, "SessionStart");
+  assert.ok(payload.additionalContext.includes(toGitBashPath(resolve(plugin, "skills/using-harness/SKILL.md"))));
+  assert.ok(payload.additionalContext.length < 1200, "hook must remain a short applicability pointer");
+  assert.ok(!payload.additionalContext.includes("<SUBAGENT-STOP>"), "hook injected Skill body");
+}
 
 // Pinned upstream content and local links must survive plugin packaging. This checks
 // integrity, not the model's interview behavior (which needs independent role evaluation).
@@ -168,7 +110,7 @@ function validateGrillingPackage(repoRoot) {
   }
   for (const relativePath of ["agents/planner.md", "skills/grilling/SKILL.md", "skills/harness-loop/SKILL.md"]) {
     const file = resolve(pluginRoot, relativePath);
-    const source = readFileSync(file, "utf8");
+    const source = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
     for (const [, target] of source.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
       if (target.startsWith("https:")) continue;
       if (!target.includes("grilling/SKILL.md") && !target.includes("agents/planner.md") && target !== "LICENSE") continue;
@@ -179,6 +121,8 @@ function validateGrillingPackage(repoRoot) {
 
 function validateLoopRules(repoRoot) {
   validateGrillingPackage(repoRoot);
+  validateReachability(repoRoot);
+  validateHook(repoRoot);
   const completed = [];
   for (const [relativePath, needles] of REQUIRED) {
     const file = resolve(repoRoot, relativePath);

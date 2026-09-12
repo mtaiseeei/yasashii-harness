@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `37ee21232d0853235eff1d0c5c14fba2bfde6aa3` (Agentic Harness v0.5.4, conditional grilling and English configuration comments)
+- Current synchronized base: `d80865042538fd906dc7c062c0d635777f308ff0` (Agentic Harness v0.5.5, conditional instruction references and authorized maintenance)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -53,6 +53,7 @@ docs/progress/sprint-001.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
 docs/releases/v0.5.4-validation.md
+docs/releases/v0.5.5.md
 docs/spec.md
 docs/spec/constraints.md
 docs/spec/domain.md
@@ -81,6 +82,11 @@ plugins/harness/scripts/resolve-runtime-config.mjs
 plugins/harness/skills/grilling/LICENSE
 plugins/harness/skills/grilling/SKILL.md
 plugins/harness/skills/harness-loop/SKILL.md
+plugins/harness/skills/harness-loop/references/evaluation.md
+plugins/harness/skills/harness-loop/references/planner-templates.md
+plugins/harness/skills/harness-loop/references/runtime.md
+plugins/harness/skills/harness-loop/references/scope.md
+plugins/harness/skills/harness-loop/references/state.md
 plugins/harness/skills/using-harness/SKILL.md
 plugins/harness/templates/.harness/.gitignore
 plugins/harness/templates/.harness/config.toml
@@ -116,3 +122,12 @@ scripts/check-windows-init.mjs
 - 条件付きgrilling Skill・原文・MITライセンス、英語のみのモデル名に依存しない設定説明を同期した。設定値は保持する。
 - やさしいPlanner追加節の固定3問を撤去し、上流の必要性判断と深掘りへ接続した。平易な日本語での対話を維持する。
 - downstream所有のREADME・positioning検査を確認し、0.5.4の説明とversion確認へ反映した。
+
+## v0.5.5 同期メモ
+
+- 上流の確定commitを通常mergeし、上記固定基点で共通本文と宣言済み追加節を合成した。未commit候補ではない。
+- upstreamの通常入口・条件付きreferences・hook・guidance保守・検証を同期。runtime/model設定とgrilling固定本文を保持。
+- downstream所有READMEとpositioning検査は、やさしいシリーズの説明を維持して更新手順と0.5.5の版へ反映。LICENSE変更なし。
+- syncは全対象事前検査でdirty・削除・symlinkを保護し、候補経路と正式固定SHA経路を区別する。
+- 初回独立確認のREADME不整合を修正し、限定修理と独立再評価、条件外のユーザー判断を両版で揃えた。
+- 導入済みcacheや利用repoの設定・guidanceを一括変更しない。詳しい変更はdocs/releases/v0.5.5.md、やさしい版の更新コマンドはREADME.mdの「既存pluginを0.5.5へ更新」を参照。

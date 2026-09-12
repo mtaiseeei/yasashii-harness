@@ -90,6 +90,7 @@ function validatePositioning(repoRoot) {
   const claude = read("CLAUDE.md");
   const skill = read("plugins/harness/skills/using-harness/SKILL.md");
   const loop = read("plugins/harness/skills/harness-loop/SKILL.md");
+  const runtime = read("plugins/harness/skills/harness-loop/references/runtime.md");
   const evaluator = read("plugins/harness/agents/evaluator.md");
   const command = read("plugins/harness/commands/harness.md");
   const harnessCommand = read("plugins/harness/scripts/harness.mjs");
@@ -198,11 +199,8 @@ function validatePositioning(repoRoot) {
       !command.includes("init-guidance.sh"),
       "plugins/harness/commands/harness.md: normal /harness flow must not bypass harness.mjs preflight",
     );
-    const commandInitCli = 'node "$CLAUDE_PLUGIN_ROOT/scripts/harness.mjs" init --root "$(pwd)"';
-    assert.ok(
-      command.split(commandInitCli).length - 1 >= 2,
-      "plugins/harness/commands/harness.md: init CLI must cover both explicit init and normal idea setup",
-    );
+    assert.ok(command.includes("../skills/using-harness/SKILL.md"), "command must route normal work to canonical entry");
+    assert.ok(skill.includes("scripts/harness.mjs init"), "entry must preserve no-overwrite init CLI");
     includesAll("plugins/harness/skills/using-harness/SKILL.md", skill, [
       "$using-harness init",
       "$using-harness check",
@@ -244,7 +242,7 @@ function validatePositioning(repoRoot) {
       "Codex App",
       "full role-model routing",
     ]);
-    includesAll("plugins/harness/skills/harness-loop/SKILL.md", loop, [
+    includesAll("plugins/harness/skills/harness-loop/references/runtime.md", runtime, [
       "2026-07-20",
       "Codex CLI",
       "Codex App",
@@ -270,11 +268,9 @@ function validatePositioning(repoRoot) {
       "host metadata",
       "freshなLuna/xhigh child",
     ]);
-    includesAll("plugins/harness/templates/docs/harness-guidance.md", harnessGuidance, [
-      "resume: true",
-      "routed model/effort",
-      "Follow-up support alone is insufficient",
-      "fresh role work unit",
+    assert.ok(harnessGuidance.includes("skills/harness-loop/SKILL.md"));
+    includesAll("plugins/harness/skills/harness-loop/references/runtime.md", runtime, [
+      "resume: true", "host metadata", "fresh",
     ]);
   });
 
@@ -288,7 +284,7 @@ function validatePositioning(repoRoot) {
   });
 
   check("plugin and marketplace versions stay synchronized", () => {
-    assert.equal(claudeManifest.version, "0.5.4");
+    assert.equal(claudeManifest.version, "0.5.5");
     assert.equal(claudeManifest.version, codexManifest.version);
     assert.equal(claudeMarketplace.metadata.version, claudeManifest.version);
     assert.equal(claudeMarketplace.plugins[0].version, claudeManifest.version);

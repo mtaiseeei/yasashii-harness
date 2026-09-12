@@ -165,6 +165,35 @@ def base_bytes(base: str, path: str) -> bytes:
     return result.stdout
 
 
+def candidate_tree(base: str, source: Path | None) -> tuple[dict[str, bytes], dict[str, int]]:
+    """Read an explicit local candidate; never advance the recorded release base."""
+    if source is None:
+        return ({path: base_bytes(base, path) for path in tree_files(base)}, tree_modes(base))
+    source = source.resolve(strict=True)
+    def source_git(*args: str) -> str:
+        return subprocess.run(["git", "-C", str(source), *args], check=True,
+                              capture_output=True, text=True).stdout.strip()
+    if Path(source_git("rev-parse", "--show-toplevel")).resolve() != source:
+        raise SyncError("candidate must be a repository root")
+    if source == ROOT or source_git("rev-parse", "HEAD") != base:
+        raise SyncError("candidate HEAD must equal the recorded upstream base (and be a separate repo)")
+    paths = set(source_git("ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")) - {""}
+    baseline = set(tree_files(base))
+    if not baseline <= paths:
+        raise SyncError("candidate deletes upstream paths; use the normal reviewed base-update procedure")
+    reserved = set(downstream_files())
+    if paths & reserved:
+        raise SyncError("candidate conflicts with downstream-owned additions")
+    content, modes = {}, {}
+    for name in sorted(paths):
+        path = source / name
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(source):
+            raise SyncError(f"candidate path is missing, a symlink, or outside source: {name}")
+        content[name] = path.read_bytes()
+        modes[name] = 0o755 if path.stat().st_mode & 0o111 else 0o644
+    return content, modes
+
+
 def compose_overlay(source: bytes, anchor: str, fragment: str, target: str) -> bytes:
     text = source.decode("utf-8")
     addition = (ROOT / fragment).read_text(encoding="utf-8").rstrip() + "\n"
@@ -175,12 +204,12 @@ def compose_overlay(source: bytes, anchor: str, fragment: str, target: str) -> b
     return text.replace(anchor, anchor + "\n\n" + addition.rstrip(), 1).encode("utf-8")
 
 
-def expected_files(base: str) -> dict[str, bytes]:
+def expected_files(base: str, source: dict[str, bytes] | None = None) -> dict[str, bytes]:
     anchors = parse_anchors()
     metadata = json.loads((OVERLAY / "metadata-overrides.json").read_text(encoding="utf-8"))
     if metadata.get("version") != 1 or not isinstance(metadata.get("files"), dict):
         raise SyncError("metadata-overrides.json must contain version=1 and files")
-    baseline = set(tree_files(base))
+    baseline = set(source) if source is not None else set(tree_files(base))
     for target in set(anchors) | set(metadata["files"]):
         if target not in baseline:
             raise SyncError(f"overlay target is absent from upstream base: {target}")
@@ -194,7 +223,7 @@ def expected_files(base: str) -> dict[str, bytes]:
     for path in sorted(baseline):
         if path in owned:
             continue
-        content = base_bytes(base, path)
+        content = source[path] if source is not None else base_bytes(base, path)
         if path in anchors:
             content = compose_overlay(content, *anchors[path], path)
         if path in metadata["files"]:
@@ -203,8 +232,8 @@ def expected_files(base: str) -> dict[str, bytes]:
     return expected
 
 
-def validate_tree(base: str, *, allow_missing_upstream: bool = False) -> None:
-    baseline = set(tree_files(base))
+def validate_tree(base: str, *, allow_missing_upstream: bool = False, paths: set[str] | None = None) -> None:
+    baseline = paths if paths is not None else set(tree_files(base))
     additions = set(downstream_files())
     actual = set(working_files())
     required = additions if allow_missing_upstream else baseline | additions
@@ -216,11 +245,14 @@ def validate_tree(base: str, *, allow_missing_upstream: bool = False) -> None:
         raise SyncError("unclassified files: " + ", ".join(unclassified))
 
 
-def validate_content(base: str) -> None:
-    expected = expected_files(base)
-    modes = tree_modes(base)
+def validate_content(base: str, source: dict[str, bytes], modes: dict[str, int]) -> None:
+    expected = expected_files(base, source)
     mismatches = []
     for path, wanted in expected.items():
+        destination = ROOT / path
+        if destination.is_symlink() or not destination.resolve().is_relative_to(ROOT):
+            mismatches.append(path)
+            continue
         current = (ROOT / path).read_bytes()
         current_mode = stat.S_IMODE((ROOT / path).stat().st_mode)
         if current != wanted or current_mode != modes[path]:
@@ -229,11 +261,32 @@ def validate_content(base: str) -> None:
         raise SyncError("composition mismatch: " + ", ".join(mismatches))
 
 
-def apply(base: str) -> None:
-    validate_tree(base, allow_missing_upstream=True)
-    modes = tree_modes(base)
-    for path, content in expected_files(base).items():
+def apply(base: str, source: dict[str, bytes], modes: dict[str, int], *, restore_missing: bool = False) -> None:
+    validate_tree(base, allow_missing_upstream=True, paths=set(source))
+    expected = expected_files(base, source)
+    # Complete preflight before the first write. Local edits must not be reset by sync.
+    head_modes = tree_modes("HEAD")
+    for path, content in expected.items():
         destination = ROOT / path
+        if destination.is_symlink() or not destination.resolve().is_relative_to(ROOT):
+            raise SyncError(f"refusing symlink/outside destination: {path}")
+        if not destination.exists():
+            if path in head_modes and not restore_missing:
+                raise SyncError(f"refusing to undo local deletion: {path}; use --restore-missing only for intended restoration")
+            continue
+        current = destination.read_bytes()
+        current_mode = stat.S_IMODE(destination.stat().st_mode)
+        if current == content and current_mode == modes[path]:
+            continue
+        tracked = git("cat-file", "-e", f"HEAD:{path}", check=False)
+        head_mode = head_modes.get(path)
+        if tracked.returncode != 0 or current != base_bytes("HEAD", path) or current_mode != head_mode:
+            raise SyncError(f"refusing to overwrite local changes: {path}")
+    for path, content in expected.items():
+        destination = ROOT / path
+        if (destination.exists() and destination.read_bytes() == content
+                and stat.S_IMODE(destination.stat().st_mode) == modes[path]):
+            continue
         destination.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
             handle.write(content)
@@ -266,15 +319,25 @@ def main() -> int:
     mode.add_argument("--apply", action="store_true")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--upstream-head")
+    parser.add_argument("--restore-missing", action="store_true",
+                        help="with --apply, explicitly restore locally deleted upstream files")
+    parser.add_argument("--upstream-worktree", type=Path,
+                        help="explicit uncommitted local candidate at the recorded base; not a release sync")
     args = parser.parse_args()
     try:
         base = read_base()
+        source, modes = candidate_tree(base, args.upstream_worktree)
         if args.apply:
-            apply(base)
-        validate_tree(base)
-        validate_content(base)
-        remote_warning(base, args.upstream_head, args.offline)
-        print(f"SYNC_OK base={base}")
+            apply(base, source, modes, restore_missing=args.restore_missing)
+        validate_tree(base, paths=set(source))
+        validate_content(base, source, modes)
+        if args.upstream_worktree is not None:
+            if args.upstream_head is not None:
+                remote_warning(base, args.upstream_head, args.offline)
+            print(f"CANDIDATE_OK base={base} source={args.upstream_worktree.resolve()} (uncommitted; recorded base unchanged)")
+        else:
+            remote_warning(base, args.upstream_head, args.offline)
+            print(f"SYNC_OK base={base}")
         return 0
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError, SyncError) as error:
         print(f"SYNC_FAIL: {error}", file=sys.stderr)

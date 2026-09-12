@@ -3,6 +3,7 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SYNC_ARGS=("$@")
 PASS=0
 FAIL=0
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/yasashii-harness-regression.XXXXXX")"
@@ -36,7 +37,7 @@ print(h.hexdigest())
 PY
 }
 
-expect_ok "overlay composition and classified tree" bash "$ROOT/scripts/sync-harness.sh" --check --offline
+expect_ok "overlay composition and classified tree" bash "$ROOT/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 expect_ok "upstream base reaches downstream HEAD" git -C "$ROOT" merge-base --is-ancestor "$(cat "$ROOT/gentle-overlay/upstream-base.txt")" HEAD
 
 origin="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
@@ -82,10 +83,10 @@ fi
 
 idempotent="$(fresh idempotent)"
 before="$(digest "$idempotent")"
-bash "$idempotent/scripts/sync-harness.sh" --apply --offline >/dev/null 2>&1
+bash "$idempotent/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline >/dev/null 2>&1
 first_rc=$?
 after_first="$(digest "$idempotent")"
-bash "$idempotent/scripts/sync-harness.sh" --apply --offline >/dev/null 2>&1
+bash "$idempotent/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline >/dev/null 2>&1
 second_rc=$?
 after_second="$(digest "$idempotent")"
 if [[ $first_rc -eq 0 && $second_rc -eq 0 && "$before" == "$after_first" && "$after_first" == "$after_second" ]]; then
@@ -96,9 +97,10 @@ fi
 
 materialize="$(fresh materialize-upstream)"
 rm "$materialize/docs/proposals/codex-model-routing.md"
-if bash "$materialize/scripts/sync-harness.sh" --apply --offline >/dev/null 2>&1 \
+expect_fail "sync apply preserves local deletion by default" bash "$materialize/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline
+if bash "$materialize/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --restore-missing --offline >/dev/null 2>&1 \
   && test -f "$materialize/docs/proposals/codex-model-routing.md" \
-  && bash "$materialize/scripts/sync-harness.sh" --check --offline >/dev/null 2>&1; then
+  && bash "$materialize/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline >/dev/null 2>&1; then
   ok "sync apply materializes missing upstream files"
 else
   ng "sync apply materializes missing upstream files"
@@ -107,7 +109,7 @@ fi
 missing_downstream="$(fresh missing-downstream)"
 rm "$missing_downstream/gentle-overlay/README.md"
 expect_fail "sync apply still rejects missing downstream files" \
-  bash "$missing_downstream/scripts/sync-harness.sh" --apply --offline
+  bash "$missing_downstream/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline
 
 yasashii_sections_ok=true
 while IFS=$'\t' read -r target _anchor fragment; do
@@ -131,31 +133,52 @@ import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace("__EOF__", "ANCHOR_THAT_DOES_NOT_EXIST", 1))
 PY
-expect_fail "missing anchor is rejected" bash "$anchor/scripts/sync-harness.sh" --check --offline
+expect_fail "missing anchor is rejected" bash "$anchor/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 composition="$(fresh composition)"
 printf '\nrogue upstream rewrite\n' >> "$composition/plugins/harness/agents/generator.md"
-expect_fail "composition mismatch is rejected" bash "$composition/scripts/sync-harness.sh" --check --offline
+expect_fail "composition mismatch is rejected" bash "$composition/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
+
+before_dirty="$(digest "$composition")"
+expect_fail "sync apply protects dirty upstream file" bash "$composition/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline
+if [[ "$before_dirty" == "$(digest "$composition")" ]]; then
+  ok "rejected dirty apply changes no files"
+else
+  ng "rejected dirty apply changes no files"
+fi
+
+symlinked="$(fresh symlinked)"
+printf 'outside sentinel\n' > "$TMP/outside.txt"
+rm "$symlinked/plugins/harness/agents/generator.md"
+ln -s "$TMP/outside.txt" "$symlinked/plugins/harness/agents/generator.md"
+expect_fail "sync apply rejects symlink destination" bash "$symlinked/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --apply --offline
+if [[ "$(cat "$TMP/outside.txt")" == "outside sentinel" ]]; then
+  ok "symlink rejection protects outside contents"
+else
+  ng "symlink rejection protects outside contents"
+fi
+expect_fail "candidate rejects downstream as source" bash "$ROOT/scripts/sync-harness.sh" --check --offline --upstream-worktree "$ROOT"
+expect_fail "candidate rejects a non-repository directory" bash "$ROOT/scripts/sync-harness.sh" --check --offline --upstream-worktree "$TMP"
 
 owned_edit="$(fresh owned-edit)"
 printf '\ndownstream readme note\n' >> "$owned_edit/README.md"
-expect_ok "downstream-owned README accepts downstream edits" bash "$owned_edit/scripts/sync-harness.sh" --check --offline
+expect_ok "downstream-owned README accepts downstream edits" bash "$owned_edit/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 owned_outside="$(fresh owned-outside)"
 printf 'NOT_IN_UPSTREAM.md\n' >> "$owned_outside/gentle-overlay/downstream-owned.txt"
-expect_fail "downstream-owned path outside upstream base is rejected" bash "$owned_outside/scripts/sync-harness.sh" --check --offline
+expect_fail "downstream-owned path outside upstream base is rejected" bash "$owned_outside/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 owned_missing="$(fresh owned-missing)"
 rm "$owned_missing/README.md"
-expect_fail "deleted downstream-owned file is rejected" bash "$owned_missing/scripts/sync-harness.sh" --check --offline
+expect_fail "deleted downstream-owned file is rejected" bash "$owned_missing/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 unclassified="$(fresh unclassified)"
 printf 'unclassified\n' > "$unclassified/UNCLASSIFIED.txt"
-expect_fail "unclassified new file is rejected" bash "$unclassified/scripts/sync-harness.sh" --check --offline
+expect_fail "unclassified new file is rejected" bash "$unclassified/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 deleted="$(fresh deleted)"
 rm "$deleted/docs/KNOWLEDGE.md"
-expect_fail "deleted upstream file is rejected" bash "$deleted/scripts/sync-harness.sh" --check --offline
+expect_fail "deleted upstream file is rejected" bash "$deleted/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
 metadata="$(fresh metadata)"
 python3 - "$metadata/.claude-plugin/marketplace.json" <<'PY'
@@ -165,9 +188,9 @@ d = json.loads(p.read_text())
 d["metadata"]["description"] = "undeclared rewrite"
 p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
 PY
-expect_fail "allowlist-external metadata change is rejected" bash "$metadata/scripts/sync-harness.sh" --check --offline
+expect_fail "allowlist-external metadata change is rejected" bash "$metadata/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --offline
 
-ahead="$(bash "$ROOT/scripts/sync-harness.sh" --check --upstream-head 1111111111111111111111111111111111111111 2>&1)"
+ahead="$(bash "$ROOT/scripts/sync-harness.sh" "${SYNC_ARGS[@]}" --check --upstream-head 1111111111111111111111111111111111111111 2>&1)"
 ahead_rc=$?
 if [[ $ahead_rc -eq 0 && "$ahead" == *"WARNING: upstream/main advanced"* ]]; then ok "upstream advance is warning only"; else ng "upstream advance is warning only"; fi
 

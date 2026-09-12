@@ -50,7 +50,36 @@ codex plugin add harness@yasashii-harness
 | 変更せず確認 | `/harness check` | `$using-harness check` |
 
 `init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
-`upgrade`はまだ実装していないため、上流更新はこのリポジトリの同期手順で取り込みます。
+Harnessのrepo guidance用`upgrade`は未実装です。plugin自体の更新は次の正式手順で行います。
+
+<a id="インストール済みpluginの更新"></a>
+
+### 既存pluginを0.5.5へ更新
+
+利用中のhostと登録済みmarketplaceの取得元を確認し、対象だけ更新します。設定、既存guidance、作業中の変更は保持します。
+
+Claude CodeのCLIでは、既存の導入scope（user / project / local）を確認して実行します。
+
+```bash
+claude plugin marketplace update yasashii-harness
+claude plugin update harness@yasashii-harness --scope user
+claude plugin list --json
+```
+
+上の`user`は既存scopeに合わせます。CodexのGitHub登録marketplaceは次で更新します。
+
+```bash
+codex plugin marketplace upgrade yasashii-harness
+codex plugin add harness@yasashii-harness
+codex plugin list --marketplace yasashii-harness --json
+```
+
+ローカルpathから登録しているCodex marketplaceはGit更新の対象外です。そのcheckoutのdirtyを保護して正式v0.5.5を取り込むか、正式tagの別checkoutを用意し、CLIのmarketplace管理で取得元を確認してから同じpluginを再導入します。cacheの中身は直接編集しません。
+両hostとも一覧と導入済みmanifestのversionが`0.5.5`になったことを確かめ、新しいセッションで使います。利用repoへのguidance一括上書きは行いません。
+
+### 0.5.5: 承認済みの作業を、必要な確認で完了まで
+
+通常ループを短くし、runtime・移行・特殊な失敗などの詳細は必要なときだけ参照します。小さな修正でも独立評価を保ち、既存検証の限定修理や意味の変わらない誤記訂正を進められます。初期化時の上書き禁止と、明示承認済みのguidance保守を区別しました。
 
 ### 0.5.4: 必要なときに深く聞くPlanner
 
@@ -94,7 +123,8 @@ Windows以外ではrunner判定だけが失敗するため、Windows実機の代
 - **実装（Generator）**: 1Sprint＝1機能ずつ実装し、合格した機能を守る自動チェックを育てます。
 - **検証（Evaluator）**: 実装とは独立に、実際にアプリを操作して合否を判定します。
   証跡のない合格は無効です。同時に、rubricと契約に書いた証跡が揃えば合格に十分で、
-  検証のための検証が膨らんだときはループを止めてユーザーに選択肢を返します。
+  既存検証の不具合は基準を変えない限定修理と独立再評価で対応できます（同Sprint 1回まで）。
+  条件を満たさない検証範囲の追加は、ユーザーに選択肢を返します。
 
 途中で止めても、`docs/spec.md` や `docs/sprints/state.md` などのファイルが正本として残るため、
 別の日に「続きから」で再開できます。
@@ -116,3 +146,9 @@ Windows以外ではrunner判定だけが失敗するため、Windows実機の代
 ## ライセンス
 
 MIT（上流と同じ）
+
+### 承認済みの作業を完了まで進める
+
+合意した範囲では、実装後の修正と独立評価まで続けます。小さな変更の確認や記録は影響に合わせ、
+重要な製品判断・範囲外の追加・承認が必要な外部操作はユーザーに戻します。画面のないツールは
+コマンドや具体的な入力・出力で確認します。未検証を合格にはしません。

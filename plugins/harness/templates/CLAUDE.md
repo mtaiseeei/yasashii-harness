@@ -1,121 +1,34 @@
 # Harness-Driven Development
 
-This repository can use Agentic Harness for substantial app or feature work. When the user asks to build an app, site, tool, or multi-step feature, prefer the harness loop instead of a single unstructured implementation pass.
+For substantial app/feature work or continuation of a Harness-managed repository, load the installed
+`harness:using-harness` Skill (`skills/using-harness/SKILL.md` under the current plugin root).
+It routes to `skills/harness-loop/SKILL.md`, the canonical normal flow. Read its references only when
+that step applies; do not copy the entire loop into project guidance. Honor the current request and existing authorization.
 
-Normally, just ask Claude Code to build the app or feature. The harness entry skill should detect the request and start the loop. For explicit startup, use:
+## Boundaries
 
-```text
-/harness <short product idea>
-```
+- Planner owns `docs/spec.md`, related `docs/spec/*.md` including rubric, and `docs/sprints/sprint-*.md` contracts.
+- Generator owns implementation and `docs/progress/sprint-*.md`; Evaluator independently runs the product
+  and owns `docs/feedback/sprint-*.md`. Do not reuse Generator self-evaluation as the verdict.
+- Only the orchestrator writes `docs/sprints/state.md`; record outcomes before proceeding. Keep Status there only.
+- A pass needs actual execution evidence. UI uses browser interaction; non-UI uses commands/API/input-output.
+- Preserve user-owned decisions, existing dirty work, credentials and external-action authorization.
+  Initialization never overwrites existing guidance, runtime configuration or Agent definitions.
+  Explicitly authorized guidance maintenance may merge necessary edits while preserving project rules and dirty work;
+  it does not authorize changing model settings or Agent definitions. Git publication needs session authorization.
 
-## Loop
+## Conditional details in the installed plugin
 
-1. Planner turns the idea into a short `docs/spec.md` index, detailed `docs/spec/*.md` files (including `docs/spec/rubric.md`), and sprint contracts in `docs/sprints/`.
-2. Generator implements one sprint, grows the automated regression suite, and updates the matching `docs/progress/sprint-*.md`.
-3. Evaluator runs the app, verifies behavior against the rubric with recorded evidence, and writes the matching `docs/feedback/sprint-*.md`.
-4. The orchestrator records the outcome in `docs/sprints/state.md` before moving on. Failed sprints go back to Generator (or to Planner when feedback is classified as a spec issue). A `verification-scope-issue` — where the failure is mainly about verification tooling or an evidence format the contract never required — goes directly to the user with options instead of looping. Passed sprints move forward. Three consecutive failures on one sprint escalate to the user, as do the `Spec-Issue Count` and `Lineage Dispatches` limits (see Proportional Verification below).
+- Small follow-ups, changed criteria or failures: `skills/harness-loop/references/scope.md`.
+  It defines direct/micro/regular patches, bounded verification repair, user approval and dispatch limits.
+- Evaluation or evidence reuse: `skills/harness-loop/references/evaluation.md`.
+- Initial dispatch, host/config changes or model/lifecycle uncertainty: `skills/harness-loop/references/runtime.md`.
+- Initialization, missing state fields or legacy migration: `skills/harness-loop/references/state.md`.
+- Planning decisions: `agents/planner.md`; output examples only when needed:
+  `skills/harness-loop/references/planner-templates.md`.
 
-## Canonical Files
+Claude Code and Codex inherit the host model/effort by default. Respect explicitly configured values through
+the resolver; do not infer model aliases or claim launch verification without child metadata.
+When subagents are unavailable, use separate role work units with the same ownership and independent evaluation.
 
-| File | Purpose | Only writer |
-|---|---|---|
-| `docs/spec.md` | Short canonical index and links to required spec files | Planner |
-| `docs/spec/product.md` | Product purpose, users, goals, non-goals, success state | Planner |
-| `docs/spec/features.md` | Cross-sprint feature list and user-visible behavior | Planner |
-| `docs/spec/constraints.md` | Cross-cutting constraints, prohibitions, safety and privacy rules | Planner |
-| `docs/spec/domain.md` | Domain rules, conceptual data, KPI/calculation definitions | Planner |
-| `docs/spec/ui.md` | Product-wide UI/UX requirements | Planner |
-| `docs/spec/rubric.md` | Scoring thresholds and per-score anchor examples | Planner |
-| `docs/sprints/state.md` | Execution state: Current ID, per-sprint status, retry count, spec-issue count, lineage dispatch budget | Orchestrator (main agent) |
-| `docs/sprints/sprint-NNN.md` | Main sprint contract, e.g. `sprint-005.md` | Planner |
-| `docs/sprints/sprint-NNN-patch-PPP.md` | Patch sprint contract, e.g. `sprint-005-patch-001.md` | Planner |
-| `docs/progress/sprint-*.md` | Implementation progress, self-evaluation, startup/test handoff | Generator |
-| `docs/feedback/sprint-*.md` | Evaluator result, scores, evidence, bugs, reproduction steps | Evaluator |
-
-Do not cross these ownership boundaries. If a role finds a problem outside its file, record it in its own handoff instead of editing another role's source of truth.
-Sprint statuses in `state.md` are: `planned`, `active`, `awaiting-eval`, `done`, `done-by-user-decision`, `deferred`, `superseded`. Never skip or reorder sprints silently; record `deferred`/`superseded` with a reason. `done-by-user-decision` records a completion the user explicitly accepted with remaining shortfalls; keep Evaluator's feedback unchanged and reference the unmet items in `state.md`.
-An older `docs/sprints/current.md` is a legacy pointer: convert it into `docs/sprints/state.md` once, then treat it as read-only reference. If an older `docs/progress.md` exists, treat it as a legacy reference log and do not append new sprint progress there.
-If an existing `state.md` has no `Model Tier`, pass `unknown` to the resolver once, persist only the returned `standard` or `strong` tier with `Rotate: runtime-migration`, and fresh-dispatch Generator. Never persist `unknown`. If only `Rotate` is absent, add `Rotate: none`. If an existing `state.md` has no `Spec-Issue Count` or `Lineage Dispatches`, add them once with `0` (or the value countable from the recorded history) on the next continuation.
-For a real Generator tier change, use the resolver's rotate reason: `model-escalation` for failure/risk/recommendation routing and `model-availability` for an unavailable standard-model fallback. When Generator is not the next role, its routing tier is null and must not replace the last dispatched tier in state.
-Use zero-padded sprint IDs. Do not create decimal sprint IDs such as `sprint-5.1` or `sprint-5.10`.
-For work between main sprints, use `sprint-NNN-patch-PPP`.
-
-## Small Changes In A Harness-Managed Repository
-
-Do not default to fixing things outside the loop. Classify every follow-up request:
-
-1. Direct fix — typos, comments, docs, config values that do not change app behavior.
-2. Micro patch (`Type: micro`) — a small behavior/UI change confined to one feature surface and one flow (for products without screens: one command or one feature area), already covered by an automated regression check. Gets a lightweight evaluation (completeness, stability, no-regression only).
-3. Regular patch sprint or next main sprint — everything else.
-
-## Planning Rules
-
-- Planner describes what the product should do, not how to implement it.
-- Follow the plugin's `agents/planner.md` Grilling gate to decide whether interviewing is needed and use the bundled grilling Skill when it is. This also applies without subagents.
-- Planner chooses the unresolved scope and canonical destinations within the user's instructions; consult the orchestrator when skipping or scope authority is doubtful.
-- Use available host-native question UI, or concise chat questions / parent relay when unavailable. Tool batch limits are not a total interview limit.
-- Planner generates `docs/spec/rubric.md` at initialization, adjusting design/originality thresholds to the project type. Evaluator proposes rubric changes in feedback; only Planner applies them.
-- Invariants confirmed by accepted sprints ("never regress this") are promoted into `docs/spec/constraints.md`, not accumulated in state files.
-- Avoid premature stack, schema, endpoint, or component decisions in the spec files.
-- Do not put verification-infrastructure implementation into specs, acceptance criteria, or the rubric: no evidence schemas, attestation formats, or collector/driver/attestor designs. Specify what to confirm; leave how to prove it to Generator and Evaluator. Never make the verification infrastructure itself a product requirement without an explicit user request.
-- The rubric lists the sufficient evidence formats per criterion (safe harbor), written as whatever the chosen verification surface naturally produces. Each sprint contract fixes its verification scope (target surfaces, required scenarios, evidence formats) at start; growing it afterwards is a scope change.
-- Tightening an active sprint's acceptance criteria, thresholds, or evidence formats — including after a spec-issue return — requires explicit user approval, and a criterion added mid-loop becomes a hard gate only from the next sprint. Relaxing, de-scoping, or demoting checks to optional internal QA is a legitimate, recordable move, proposed by Planner and approved by the user.
-- If a decision changes the product direction, ask the user before implementation.
-- Prefer ambitious but testable product behavior over a tiny CRUD-only MVP.
-
-## Implementation Rules
-
-- Generator works one sprint at a time.
-- Keep the app runnable at the end of every sprint.
-- Read `docs/spec.md`, the required `docs/spec/*.md` files, `docs/sprints/state.md`, and the target `docs/sprints/sprint-*.md` before editing code.
-- When acceptance criteria pass, add automated checks that protect them to the regression suite, and record the suite's run command in the progress handoff. Checks assert behavior and data, not fragile visual string matches.
-- Update the matching `docs/progress/sprint-*.md` with implemented features, known issues, startup command, test URL, regression-check command, and concrete evaluation scenarios.
-- Fix failing feedback before starting a new sprint.
-- Prefix Generator-authored commit messages with the sprint ID, e.g. `[sprint-010-patch-008]`. Never run `git init` inside an existing repository.
-- Do not silently include user-requested work that is outside the current acceptance criteria. Record it as a scope change and route it to Planner for an automatically numbered patch sprint (micro when it qualifies).
-
-## Evaluation Rules
-
-- Evaluator must operate the real app before marking a sprint complete.
-- Score against `docs/spec/rubric.md`; one failed threshold means the sprint fails — for criteria that existed in the contract and rubric when the sprint started. Criteria added mid-loop are advisory for the current sprint until the user approves hard-gating them.
-- A pass requires recorded evidence: executed commands with results, and the concrete URL/DOM/browser interactions checked. Screenshots are mandatory whenever UI, responsiveness, or visual quality is scored. A pass without evidence is invalid.
-- Evidence sufficiency (safe harbor): the evidence formats listed in the rubric and contract are sufficient for a pass. Evaluator must not invent additional evidence formats (approval manifests, digest pinning, attestation, a unified cross-surface evidence schema) as pass conditions. Whatever the chosen verification surface naturally produces (command output, interaction records, screenshots, host-owned session records) is acceptable, and building new evidence-collection infrastructure is never a pass condition. Stronger-evidence ideas go to improvement proposals for user approval. The listed formats can never fall below the evidence floor above; if the rubric and contract list no evidence formats, the floor itself is the safe harbor. The safe harbor bounds what may be demanded as pass conditions, not what Evaluator may observe: product defects observed outside the fixed verification scope remain valid findings against criteria that existed at sprint start.
-- Classify every finding as `product` or `verification-infra`; when unsure, classify it as `product`. A `verification-infra` finding alone does not fail the sprint; severe ones are classified `verification-scope-issue` and go to the user with options. A no-regression score cannot pass while the handed-over regression suite is unrunnable or failing; if the suite itself is the main cause, that is a `verification-scope-issue` for the user.
-- Re-evaluation within one sprint is incremental: verify the changed surfaces plus the regression suite, carry over recorded evidence for unchanged surfaces, and reuse recorded evidence for an unchanged commit. Changed surfaces are determined from the actual git diff, not Generator's self-report; evidence carry-over requires the handed-over regression suite to run green, and unchanged-commit reuse requires a clean working tree.
-- A user-declared real-host confirmation, once recorded in `state.md` by the orchestrator, may serve as evidence for the matching criteria (Generator self-reports still cannot). Record it with the timestamp, the quoted declaration, the matching criteria, and the commit hash; it expires when related code changes after that commit.
-- Run the handed-over regression suite as the baseline for the no-regression score, then manually verify the surfaces this sprint touched.
-- Classify failures as `implementation-issue` (back to Generator), `spec-issue` (back to Planner via the orchestrator), or `verification-scope-issue` (directly to the user with options; never auto-routed to Generator or Planner).
-- For patch sprints such as `sprint-005-patch-001`, verify the patch behavior, base sprint regression, and absence of next-main-sprint feature leakage. `Type: micro` patches get the lightweight scoring set.
-
-Browser verification priority:
-
-1. Claude Code Desktop App: Preview pane / autoVerify.
-2. Claude Code CLI: Playwright test or Playwright script; use a Playwright MCP only if the host already provides one.
-3. Exceptions: real Chrome or Computer Use only when signed-in browser state or GUI-only behavior is required.
-4. Fallback: build, HTTP checks, static screenshots, and explicit manual verification notes.
-
-## Done Means Verified
-
-Do not declare completion only because code was written. A sprint is complete only after Evaluator verifies the running product with evidence and the orchestrator records the result in `docs/sprints/state.md`.
-
-The one exception is `done-by-user-decision`: the user may explicitly accept a sprint with recorded shortfalls. The orchestrator records the reasons and remaining risks in `state.md`, Evaluator's feedback stays unchanged, and later sprints can see what was not verified.
-
-## Proportional Verification
-
-Verification exists to ship the product; the verification infrastructure itself is not a product requirement.
-
-- Before each Generator/Evaluator dispatch the orchestrator checks `Lineage Dispatches` in `state.md`: at the configured limit (`limits.max_lineage_dispatches` in `.harness/config.toml`, default 10), stop and give the user options instead of dispatching; otherwise record the increment, then dispatch. The counter always equals actual dispatches, and a synchronous pre-child-creation launch rejection consumes no budget. It accumulates across retries, spec-issue returns, patch sprints, and fresh role rotations of the same base sprint, and resets only when moving to the next main sprint or on an explicit user reset.
-- A spec-issue return increments `Spec-Issue Count` without consuming Retry Count. Reaching `limits.max_spec_issue_returns` (default 2) on one sprint stops for user confirmation, and every post-spec-issue contract change passes user review before Step 2 resumes.
-- If a sprint round's diff contains only verification code (no product code) twice in a row, or the repository's verification code outgrows the product code, report it to the user before dispatching again.
-- Guard stops present options — fix as demanded, accept at a lower evidence level, or de-scope — rather than silently aborting. Removing a check that the contract explicitly de-scoped is not "deleting tests to pass".
-
-## Model Policy
-
-Do not infer or translate model names across hosts. Claude Code and Codex both inherit the user's current model and effort for every role by default. Do not ask Codex to identify itself as App or CLI. Codex CLI may omit `model` and `reasoning_effort` from its displayed spawn schema even when the runtime parser accepts them; schema omission alone must not force an explicitly configured value back to `inherit`. When native `spawn_agent` is available, dispatch the actual built-in/default Agent once with the resolver's exact `dispatch-attempt` values, passing the exact model and reasoning_effort directly. Apply this rule to every exact model/effort selected by shared config, personal config, or the user, including explicit Luna/Sol settings.
-
-Feed an `Unknown model` or invalid-effort refusal back through `--launch-rejected-model` or `--launch-rejected-effort` only when it occurs before child creation. An `unknown field` rejection instead means that application path is unavailable. Never treat implementation failure as launch rejection, and never use Terra or `codex exec` as an automatic fallback. Neither `dispatch-ready` nor `dispatch-attempt` proves which model actually launched; mark `launch-verified` only after child host metadata matches the dispatched values.
-
-Shared Harness runtime settings live in `.harness/config.toml`; personal leaf overrides live in the git-ignored
-`.harness/config.local.toml`. The default lifecycle is `balanced`. A high-risk Sprint, the second consecutive implementation failure, or an evidence-verified Evaluator recommendation selects the strong tier. A tier change always starts fresh. The same tier may resume only when host metadata proves that resume preserves the routed model and effort; follow-up support alone is insufficient. The third consecutive failure stops for user input; a spec issue returns to Planner without consuming Generator escalation.
-Codex uses native direct dispatch for explicit Luna and other role values. A legacy `hosts.codex.custom_agents` table is accepted only for compatibility, ignored with a deprecation warning, and never changes routing. Users do not need to delete the old setting or an existing Agent definition.
-Never overwrite existing guidance, `.claude/agents/`, `.codex/agents/`, or Harness configuration to apply these settings.
+Claude Code entry: `/harness <idea>` (ordinary requests also work).

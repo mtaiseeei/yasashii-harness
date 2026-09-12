@@ -362,16 +362,18 @@ check("strong Generator routing remains direct and wins before Luna availability
   assert.equal(highRisk.hosts.codex.roles.generator.dispatch.mode, "direct");
 });
 
-check("generated guidance preserves native direct dispatch and hidden-schema rules", () => {
+check("generated guidance reaches canonical runtime rules without duplicating them", () => {
   for (const relative of ["templates/AGENTS.md", "templates/CLAUDE.md"]) {
     const source = fs.readFileSync(path.join(pluginRoot, relative), "utf8");
-    assert.match(source, /displayed spawn schema.*runtime parser accepts/is);
-    assert.match(source, /schema omission alone must not force an explicitly configured value back to `inherit`/i);
-    assert.match(source, /resolver's exact `dispatch-attempt` values/i);
-    assert.match(source, /built-in\/default Agent.*model.*reasoning_effort/is);
-    assert.match(source, /`unknown field` rejection.*application path is unavailable/is);
-    assert.match(source, /child host metadata matches the dispatched values/is);
+    assert.ok(source.includes("skills/harness-loop/references/runtime.md"));
+    assert.ok(source.includes("skills/using-harness/SKILL.md"));
   }
+  const runtime = fs.readFileSync(path.join(pluginRoot, "skills/harness-loop/references/runtime.md"), "utf8");
+  assert.match(runtime, /runtime parser/);
+  assert.match(runtime, /公開schemaに欄が無いことだけ/);
+  assert.match(runtime, /built-in\/default Agent/);
+  assert.match(runtime, /unknown field/);
+  assert.match(runtime, /host metadata/);
 });
 
 check("recorded Codex CLI and App capability snapshots resolve without claiming launch verification", () => {
@@ -1091,7 +1093,10 @@ check("pass transition retains the last dispatched tier until the next Sprint ro
 });
 
 check("orchestration contract records model tier before fresh dispatch and keeps Evaluator read-only", () => {
-  const loop = fs.readFileSync(path.join(pluginRoot, "skills/harness-loop/SKILL.md"), "utf8");
+  const entry = fs.readFileSync(path.join(pluginRoot, "skills/harness-loop/SKILL.md"), "utf8");
+  const references = ["state.md", "runtime.md", "scope.md"];
+  for (const reference of references) assert.ok(entry.includes(`references/${reference}`));
+  const loop = references.map((reference) => fs.readFileSync(path.join(pluginRoot, "skills/harness-loop/references", reference), "utf8")).join("\n") + entry;
   const evaluator = fs.readFileSync(path.join(pluginRoot, "agents/evaluator.md"), "utf8");
   assert.match(loop, /Model Tier.*standard.*strong/is);
   assert.match(loop, /Rotate:\s*model-escalation/i);
@@ -1121,6 +1126,18 @@ check("orchestration contract records model tier before fresh dispatch and keeps
   assert.match(evaluator, /Escalation Recommendation:\s*strong/i);
   assert.match(evaluator, /証拠|evidence/i);
   assert.match(evaluator, /(?:実装|コード).*(?:しない|修正しない)/);
+});
+
+check("bounded verification repair reuses existing retry input without changing counters or classification", () => {
+  const root = fixture();
+  const state = path.join(root, "docs/sprints/state.md");
+  fs.mkdirSync(path.dirname(state), { recursive: true });
+  fs.writeFileSync(state, "Current ID: sprint-001\nRetry Count: 1\nFailure: verification-scope-issue\n");
+  const before = sha(state);
+  const result = resolveRuntimeConfig({ root, host: "codex", event: "retry", retryCount: 1, currentModelTier: "standard", capabilityOverrides: completeCapabilities() });
+  assert.equal(result.routing.nextRole, "generator");
+  assert.equal(result.hosts.codex.roles.generator.routing.modelTier, "standard");
+  assert.equal(sha(state), before);
 });
 
 check("launch rejection CLI input is explicit, repeatable, and requires one selected host", () => {
@@ -1553,15 +1570,16 @@ check("unknown rotate roles fail visibly", () => {
   assert.match(cli.stderr, /invalid --rotate role/);
 });
 
-check("all role agents protect canonical TOML and identify JSON only as legacy compatibility", () => {
+check("roles preserve config ownership and canonical runtime documents legacy compatibility", () => {
   for (const role of ["planner", "generator", "evaluator"]) {
     const definition = fs.readFileSync(path.join(pluginRoot, `agents/${role}.md`), "utf8");
-    assert.match(definition, /\.harness\/config\.toml/);
-    assert.match(definition, /\.harness\/config\.local\.toml/);
-    assert.match(definition, /編集・上書きせず/);
-    assert.match(definition, /旧 `.harness\/config\.json` \/ `.harness\/config\.local\.json` もlegacy互換入力/);
-    assert.doesNotMatch(definition, /config\*\.json/);
+    assert.match(definition, /設定|config/);
+    assert.match(definition, /編集・上書きせず|保護する|編集・再解釈しない/);
   }
+  const runtime = fs.readFileSync(path.join(pluginRoot, "skills/harness-loop/references/runtime.md"), "utf8");
+  assert.match(runtime, /\.harness\/config\.toml/);
+  assert.match(runtime, /\.harness\/config\.local\.toml/);
+  assert.match(runtime, /旧JSON.*互換/is);
 });
 
 check("TOML syntax, type, and unknown-key errors are diagnosed with safe effective values", () => {
