@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `ed0b2835f11f6b10e767851d04745f3291cbcce4` (Sprint 003 autonomy/document design, local verified candidate; unpublished)
+- Current synchronized base: `1e599e4871c626fa9d2b8711901550103d968411` (Sprint 003 autonomy/document design, local verified candidate; unpublished)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -48,6 +48,8 @@ docs/KNOWLEDGE-v0.5.5.md
 docs/KNOWLEDGE.md
 docs/feedback/sprint-001-patch-001.md
 docs/feedback/sprint-001.md
+docs/feedback/sprint-003-downstream.md
+docs/feedback/sprint-003-incremental.md
 docs/feedback/sprint-003.md
 docs/harness-guidance.md
 docs/progress/sprint-001-patch-001.md

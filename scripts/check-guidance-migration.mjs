@@ -52,6 +52,22 @@ try {
     assert.equal(command(root, ["check"]).status, 0);
     fs.chmodSync(path.join(root, "docs/history/old.md"), 0o600);
   });
+  check("PROJECT and legacy current sources keep unresolved work without a second current state", () => {
+    for (const source of ["PROJECT.md", "docs/sprints/current.md", "planning/current.md"]) {
+      const root = fixture(`current-${source.replaceAll("/", "-")}`);
+      const original = "# Current work\n- Unresolved: choose retention\n- Authorization: local only\n";
+      write(root, source, original);
+      write(root, "AGENTS.md", `Current source: [current](${source}).\n`);
+      const result = command(root, ["init"]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(fs.readFileSync(path.join(root, source), "utf8"), original);
+      assert.equal(fs.existsSync(path.join(root, "docs/sprints/state.md")), false);
+      assert.ok(result.stdout.includes(`canonical state: ${source}`));
+      const before = snapshot(root);
+      assert.equal(command(root, ["check"]).status, 0);
+      assert.deepEqual(snapshot(root), before);
+    }
+  });
   check("explicit sources support other layouts and reject source symlinks without writing", () => {
     const root = fixture("explicit");
     write(root, "planning/intent.md", "# Intent\n");

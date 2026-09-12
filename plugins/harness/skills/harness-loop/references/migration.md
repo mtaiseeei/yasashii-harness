@@ -20,7 +20,9 @@ semantic inspection, not proof that every conflicting instruction was detected.
 `init` creates only missing root guidance/config, a short specification index and
 current state when none is discovered. It never seeds six domain documents or
 CONTEXT.md. It recognizes conventional source names and relevant root guidance
-links; explicit source flags support other layouts. Multiple existing candidates
+links; PROJECT.md, legacy docs/sprints/current.md and linked current.md are reused
+rather than creating a second current-state document. Explicit source flags support
+other layouts. Multiple existing candidates
 are reported rather than replaced. Follow the project's actual canonical source;
 do not treat every candidate as a required read. Use explicit flags when checking
 or initializing a layout that discovery cannot identify.

@@ -43,10 +43,10 @@ export function guidanceSources(root, options = {}) {
   }
   for (const [kind, names, defaultPath] of [
     ["spec", ["docs/spec.md", "SPEC.md", "spec.md", "docs/SPEC.md", "docs/requirements.md", "docs/PRD.md", "PROJECT.md"], "docs/spec.md"],
-    ["state", ["docs/sprints/state.md", "state.md", "STATE.md", "docs/state.md", "NEXT_SESSION.md"], "docs/sprints/state.md"],
+    ["state", ["docs/sprints/state.md", "docs/sprints/current.md", "state.md", "STATE.md", "current.md", "CURRENT.md", "docs/state.md", "NEXT_SESSION.md", "PROJECT.md"], "docs/sprints/state.md"],
   ]) {
     const explicit = options[`${kind}Path`];
-    const candidates = explicit ? [explicit] : [...new Set([...names, ...links.filter((value) => kind === "state" ? /(?:state|next.session)\.md$/iu.test(value) : /(?:spec|requirements|prd|project)[^/]*\.md$/iu.test(value))])];
+    const candidates = explicit ? [explicit] : [...new Set([...names, ...links.filter((value) => kind === "state" ? /(?:state|current|next.session|project)\.md$/iu.test(value) : /(?:spec|requirements|prd|project)[^/]*\.md$/iu.test(value))])];
     const existing = [];
     for (const relative of candidates) {
       if (typeof relative !== "string" || path.isAbsolute(relative) || relative.includes("\\") || relative.split("/").some((part) => !part || part === "." || part === "..") || !relative.endsWith(".md")) {
