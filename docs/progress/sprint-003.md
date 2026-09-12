@@ -21,3 +21,10 @@ resolverの実挙動の期待・検証範囲・証拠要件は変更していな
 最終確認でPROJECT.md/旧current.mdを使うrepoに第二のstateが生成されるケースを再現した（product）。
 現在状態の既存候補とroot guidanceのcurrentリンクを認識する局所修正を行い、原文・未決の保持とstate非重複を実動検査へ追加。
 元のAC-03/AC-05を満たす修理であり新しい受け入れ条件は追加していない。独立の増分再評価へ渡す。
+
+完了結果: 初期化の局所修正を独立再評価しruntime57/migration8/Windows互換8 PASS。
+Yasashiiは上流 `1e599e4871c626fa9d2b8711901550103d968411` を通常mergeした `36093c406bd784d5130c0aa34df976d4b0dfab13` で固定SHA同期済み。
+下流初回44回帰と独立PASSを保持し、変更した初期化は下流migration8を再実行してPASS。
+公開・通常installed更新は行っていない。以後のstate/評価記録反映は製品不変の文書差分。
+常設AGENTSは4,973→2,579bytes（59→29行）。静的文書量の実測であり、速度率ではない。
+Skill Creatorの補助quick_validateはhostにPyYAMLがなく実行不可。製品のCLI/manifest/Skill到達性検査と独立評価はPASS。
