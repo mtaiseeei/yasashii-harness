@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `d80865042538fd906dc7c062c0d635777f308ff0` (Agentic Harness v0.5.5, conditional instruction references and authorized maintenance)
+- Current synchronized base: `ed0b2835f11f6b10e767851d04745f3291cbcce4` (Sprint 003 autonomy/document design, local verified candidate; unpublished)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -44,25 +44,33 @@ AGENTS.md
 CLAUDE.md
 LICENSE
 README.md
+docs/KNOWLEDGE-v0.5.5.md
 docs/KNOWLEDGE.md
 docs/feedback/sprint-001-patch-001.md
 docs/feedback/sprint-001.md
+docs/feedback/sprint-003.md
 docs/harness-guidance.md
 docs/progress/sprint-001-patch-001.md
 docs/progress/sprint-001.md
+docs/progress/sprint-003.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
 docs/releases/v0.5.4-validation.md
 docs/releases/v0.5.5.md
 docs/spec.md
 docs/spec/constraints.md
+docs/spec/decisions.md
 docs/spec/domain.md
 docs/spec/features.md
 docs/spec/product.md
+docs/spec/rubric-history.md
 docs/spec/rubric.md
+docs/spec/runtime.md
 docs/spec/ui.md
 docs/sprints/sprint-001-patch-001.md
 docs/sprints/sprint-001.md
+docs/sprints/sprint-003.md
+docs/sprints/state-through-v0.5.5.md
 docs/sprints/state.md
 plugins/harness/.claude-plugin/plugin.json
 plugins/harness/.codex-plugin/plugin.json
@@ -74,6 +82,7 @@ plugins/harness/hooks/hooks.json
 plugins/harness/hooks/session-start.sh
 plugins/harness/scripts/check-runtime-config.mjs
 plugins/harness/scripts/git-bash-path.mjs
+plugins/harness/scripts/guidance-migration.mjs
 plugins/harness/scripts/harness.mjs
 plugins/harness/scripts/init-guidance.sh
 plugins/harness/scripts/node-guidance-initializer.mjs
@@ -81,8 +90,10 @@ plugins/harness/scripts/platform-permissions.mjs
 plugins/harness/scripts/resolve-runtime-config.mjs
 plugins/harness/skills/grilling/LICENSE
 plugins/harness/skills/grilling/SKILL.md
+plugins/harness/skills/grilling/references/upstream.md
 plugins/harness/skills/harness-loop/SKILL.md
 plugins/harness/skills/harness-loop/references/evaluation.md
+plugins/harness/skills/harness-loop/references/migration.md
 plugins/harness/skills/harness-loop/references/planner-templates.md
 plugins/harness/skills/harness-loop/references/runtime.md
 plugins/harness/skills/harness-loop/references/scope.md
@@ -96,6 +107,7 @@ plugins/harness/templates/docs/harness-guidance.md
 plugins/harness/vendor/smol-toml/LICENSE
 plugins/harness/vendor/smol-toml/README.md
 plugins/harness/vendor/smol-toml/index.cjs
+scripts/check-guidance-migration.mjs
 scripts/check-loop-rules.mjs
 scripts/check-positioning.mjs
 scripts/check-windows-init.mjs
@@ -105,7 +117,7 @@ scripts/check-windows-init.mjs
 
 1. `bash scripts/sync-harness.sh --check` の機械検査を通す。
 2. upstreamの追加・変更された節を読み、yasashii節と矛盾しないか確認する。
-3. 6規律、3 Agent分離、証跡、評価閾値、回帰ゼロ許容が緩んでいないことを確認する。
+3. 小変更の直接完了、通常機能の完成時独立レビュー、高リスク承認境界、証跡とdirty保護が上流と整合することを確認する。
 4. 問題がなければdownstreamだけにcommitし、upstreamへpushしない。
 
 ## v0.5.3 同期メモ
@@ -135,3 +147,7 @@ scripts/check-windows-init.mjs
 ### A-16: Bash 3.2の引数なし管理回帰
 
 正式固定SHAの引数なし回帰で、`set -u`と空配列転送が組み合わさり`SYNC_ARGS[@]: unbound variable`となる不具合を検出した。引数がある場合だけ配列を展開するBash 3.2対応表記へ直し、空引数・空白入り引数の保持を実行確認した。合否条件・期待結果・証拠要件は変更しない、Sprint内1回の既存検証限定修理として扱う。
+
+## Sprint 003 自律実行と文書設計
+
+上流の確定したlocal commitを通常mergeし、固定SHAの本文と追加節を合成する。README・positioning検査は下流の配布識別を保持して更新する。小変更へ常時3役を要求した旧補足は置換し、質問停止・必要検証の境界を上流に揃える。公開versionは変更せず、remote push/tag/Release・installed更新は行わない。検証結果は独立評価の引き渡しに記録する。

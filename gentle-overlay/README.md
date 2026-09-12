@@ -11,7 +11,7 @@
 
 配布識別子だけは `metadata-overrides.json` の field allowlist に従って変更します。
 同期時は `scripts/sync-harness.sh --apply`、検査時は `scripts/sync-harness.sh --check --offline` を使います。
-上流の新しい節がやさしさ規約や6規律と矛盾しないかは、機械検査後に必ず目視確認します。
+上流の新しい節がやさしさ規約や影響に応じた進め方と矛盾しないかは、機械検査後に必ず目視確認します。
 
 ## 未commitの上流候補をローカルで確認する
 
@@ -35,4 +35,4 @@ bash scripts/regression-check.sh --upstream-worktree /absolute/path/to/agentic-h
 上流でcommitされた変更を取り込む段階では、通常の基点更新と差分レビューへ戻ります。
 commit / push / release / cache更新は、この候補確認の権限には含まれません。
 
-明示承認済みの正式配布では、候補確認と区別して確定した上流commitを通常mergeし、`upstream-base.txt`と対応表を更新します。競合は既存変更と追加節を保持して必要箇所だけ解消し、固定SHAのsync検査と独立評価後にdownstreamのoriginへ公開します。初期化や候補確認そのものは公開を許可しません。
+明示承認済みの正式配布では、候補確認と区別して確定した上流commitを通常mergeし、`upstream-base.txt`と対応表を更新します。競合は既存変更と追加節を保持して必要箇所だけ解消し、固定SHAのsync検査と必要な独立評価を行います。downstreamのoriginへの公開はセッションで明示承認された場合だけ行います。初期化や候補確認そのものは公開を許可しません。

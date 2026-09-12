@@ -1,19 +1,27 @@
-# Sprint State
+# Current work
 
-<!-- オーケストレーターだけが書く進行状態の正本 -->
-
-- Current ID: sprint-001-patch-001
+- Purpose: 小変更の自律完了、必要な設計・検証、現在地と意思決定の継承を中心とするHarnessへ更新する。
+- Current ID: sprint-003
+- Status: awaiting-eval
 - Retry Count: 0
 - Spec-Issue Count: 0
-- Lineage Dispatches: 4
+- Lineage Dispatches: 3
 - Model Tier: standard
 - Rotate: none
-- Next Planned: TBD
+- Next Planned: Agentic独立評価後、Yasashii正式固定SHA同期
 
-## スプリント一覧
-| ID | Status | Contract | Progress | Feedback |
-|----|--------|----------|----------|----------|
-| sprint-001 | done | [contract](sprint-001.md) | [progress](../progress/sprint-001.md) | [feedback](../feedback/sprint-001.md) |
-| sprint-001-patch-001 | done | [contract](sprint-001-patch-001.md) | [progress](../progress/sprint-001-patch-001.md) | [feedback](../feedback/sprint-001-patch-001.md) |
+## Authority and constraints
+- 2026-09-12承認: guidance/roles/skills/templates/docs、必要な初期化・保守移行と検査の整合修正、限定commitと下流同期。
+- 既存dirtyと独自規則を保持。モデル/effort継承。remote push/tag/Release、installed更新、消費repoの移行は対象外。
+- このSprintはプラグイン全体変更のため独立評価が必要。仕様は [契約](sprint-003.md) と [索引](../spec.md) に確定。
 
-## Deferred / Superseded
+## Current work and evidence
+- 実装: routing、文書・質問設計、最小初期化、既存文書の保守移行を実装済み。
+- 検証: positioning 5、loop-rules、runtime 57、migration 7、Windows互換8がPASS（darwin）。
+  独立の代表5シナリオ、移行の独自実動、Claude validate、JSON、隔離Codex installもPASS。
+- 証跡: [独立評価](../feedback/sprint-003.md)、[実装引き渡し](../progress/sprint-003.md)。
+- 対象版: 公開v0.5.5からのSprint003候補。製品差分と関係依存物を評価済み。配備は未実施。
+- 未解決: 製品判断なし。Yasashii正式同期・下流検証が残る。
+- 限定事項: Windows実機・速度比較は未実施。保守移行は自然言語の意味・anchorを自動判定しない。
+- 次の一手: Agenticの限定commitを固定し、Yasashiiへ通常merge・合成・検証する。
+- 過去状態: [history](state-through-v0.5.5.md)。通常再開で全文を読む必要はない。

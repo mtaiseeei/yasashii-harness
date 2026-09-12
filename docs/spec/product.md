@@ -1,39 +1,19 @@
-# Product
+# 製品目的
 
-## 対象
-
-- Agentic HarnessをCodex AppまたはCodex CLIで利用し、roleごとのmodel / effortを明示する利用者
-- Agentic Harnessの配布物、runtime resolver、導入ガイダンスを保守する開発者
-
-## 背景
-
-Codex Desktop `0.148.0-alpha.9`では、custom agentを指定せずbuilt-in/default Agentへ
-`gpt-5.6-luna` / `xhigh`を直接渡す起動が確認された。2026-08-17の確認では、子session
-`01a00c9a-94b4-78c3-9398-6361f49d9f69`の最初のhost metadataがmodel `gpt-5.6-luna`、
-effort `xhigh`、agent role `default`を記録した。
-
-この確認により、Lunaを起動するためだけに`harness_luna_worker`を用意する配布経路は不要になった。
-
-## ゴール
-
-- Codexで明示されたLunaを、custom agent定義に依存せずbuilt-in/default Agentへ直接dispatchする。
-- 配布物からcustom agentの作成・検査・routing案内を取り除き、利用者が追加定義を準備しなくてもよい状態にする。
-- 旧`hosts.codex.custom_agents`設定が残る既存repoを停止させず、非推奨で無効な入力として分かりやすく案内する。
-- Lunaが現在のhostで同期的に拒否された場合の安全なfallbackを維持する。
-- App / CLIの古い説明を、確認できた事実と未確認事項を区別した現在の説明へ直す。
+Agentic Harnessは、短い依頼から開発を進めるCodex / Claude Code利用者が、目的・決定・現在地を
+引き継ぎ、変更の影響に合った検証で完了できるpluginである。初回から堅い実装を目指しつつ、
+小さな変更に一律の質問・契約・3役・履歴読取を課さない。
 
 ## 成功状態
 
-明示的にLunaを選んだCodex roleがdirect dispatch契約を受け取り、global custom agent定義の有無に左右されない。
-旧custom-agent設定が残っていても解決処理は継続し、native経路を使うことがwarningから分かる。
-配布テンプレートと利用者向け説明にはcustom agentの作成手順が残らず、既存のfallbackと保護境界は回帰しない。
+- 小さな変更は担当Agentが必要な検証まで直接完了する。
+- 通常機能は短い計画と完成時の独立レビュー、大きく曖昧な開発は必要な設計文書と意味のある作業単位を使う。
+- 現在状態から必要仕様とコードへ短く到達でき、既決事項を聞き直さない。
+- 既存repoを初期化で上書きせず、確認可能な保守移行で古い指示を更新できる。
 
-## 非ゴール
+改善指標は完了時間・読取量・質問数・手戻り。品質の合格と速度実測は分け、未計測の高速化率を主張しない。
 
-- ユーザー所有の`~/.codex/agents`配下を変更または削除すること
-- Harness導入済みrepoの`.harness/config.toml`や`.harness/config.local.toml`を自動編集すること
-- Codexの配布時model既定を`inherit`から変更すること
-- Claude Codeのrole routingやmodel既定を変更すること
-- resume時のmodel / effort保持を新たに保証すること
-- Terraを自動routing候補に追加すること
-- pluginの公開、Marketplace更新、導入済みcacheの更新までをこのSprintで実行すること
+## 対象外
+
+全面DDD工程、追加DB、記憶server、常駐監視、全役割への巨大な共通context、制御用の追加loop。
+今回の実装では消費側repoの自動移行、remote push / tag / Release、installed plugin更新を行わない。

@@ -1,64 +1,81 @@
 # やさしいハーネス（yasashii-harness）
 
 やさしいハーネスは、非エンジニア向けAI秘書 **やさしいセクレタリ（yasashii-secretary）** と連携して
-「開発の脳」を担う補助プラグインです。秘書に「〇〇を作って」と頼んだとき、
-実際の企画→実装→検証を引き受けるのがこのハーネスです。
+「開発の脳」を担う補助プラグインです。秘書に「〇〇を作って」と頼んだときの設計・実装・検証を引き受けます。
 
-上流の [Agentic Harness](https://github.com/mtaiseeei/agentic-harness) をそのまま土台にし、
-規律（Planner / Generator / Evaluator の3 role、ファイル正本、Sprint、独立評価）は緩めず、
-報告と言葉遣いだけを非エンジニアにも追いやすくしています。
+上流Agentic Harnessの仕組みを保ち、進捗や判断理由を平易な日本語で説明します。
+小変更は直接修正と必要な確認で完了し、通常機能は短い計画と完成時の独立レビューで進めます。
+大きく曖昧な開発は必要な仕様とSprintを使い、高リスク操作の承認境界・実行前確認・実行後検証を守ります。
+
+https://github.com/mtaiseeei/agentic-harness
 
 ## やさしいシリーズでの位置づけ
 
-- **やさしいセクレタリ**（[mtaiseeei/yasashii-secretary](https://github.com/mtaiseeei/yasashii-secretary)）:
-  記憶・予定・プロジェクトを扱うAI秘書。シリーズの本体で、日々の窓口です。
-- **やさしいハーネス**（このリポジトリ）: 秘書から「〇〇を作って」で接続される開発担当。
-  企画（Planner）→実装（Generator）→検証（Evaluator）のループを回します。
+- **やさしいセクレタリ**: 記憶・予定・プロジェクトを扱うAI秘書。日々の窓口です。
+- **やさしいハーネス**: 秘書から開発依頼を受け、目的・決定・現在地を引き継いで完成まで進める担当です。
 
-配布は独立したプラグインです。秘書の `build` スキルが導入状態を確認し、未導入なら導入手順を
-案内します。やさしいハーネス単体でも、上流と同じく Claude Code / Codex 両対応の
-通常の開発ハーネスとして使えます。
+https://github.com/mtaiseeei/yasashii-secretary
+
+独立したpluginなので単体でもClaude Code / Codexから使えます。
 
 ## 入れ方
 
-### Claude Code（3コマンド）
-
-上から順に実行します。
+Claude Code:
 
 ```text
 /plugin marketplace add mtaiseeei/yasashii-harness
 /plugin install harness@yasashii-harness
-/harness 作りたいものを一言で説明
 ```
 
-### Codex
+Codex:
 
 ```text
 codex plugin marketplace add mtaiseeei/yasashii-harness
 codex plugin add harness@yasashii-harness
 ```
 
-どちらのホストでも、導入後は「〇〇なアプリを作って」と普通に会話するだけで起動します。
-明示的に始めたいときは、Claude Code では `/harness`、Codex では `$using-harness` または
-`$harness-loop` を使います（`/harness` コマンドは Claude Code 専用です）。
+導入後は「〇〇なアプリを作って」「表示順を直して」と普通に依頼できます。
+明示入口はClaude Codeの `/harness`、Codexの `$using-harness`。
+共通の入口は [using-harness](plugins/harness/skills/using-harness/SKILL.md) です。
 
-導入だけ行う場合と、現在の導入状態を確認する場合は次を使います。
+## 進め方
 
-| 目的 | Claude Code | Codex |
-|---|---|---|
-| 安全に初期化 | `/harness init` | `$using-harness init` |
-| 変更せず確認 | `/harness check` | `$using-harness check` |
+| 依頼 | 動き |
+|---|---|
+| 小さく可逆な修正 | 小さな挙動変更も直接修正・必要検証で完了。独立レビューやmicro契約を必須にしない |
+| 通常の機能追加 | 必要な短い計画を作り、実装・検証後に独立レビュー |
+| 移行・権限・本番重要操作 | 対象・影響・復旧方法と承認を実行前に確認し、実行後検証と独立レビュー |
+| 大きく曖昧な開発 | 必要な資料と仕様で設計し、意味のある単位で実装・独立評価 |
 
-`init`と`check`だけではPlannerやSprintは開始しません。既存ファイルも上書きしません。
-Harnessのrepo guidance用`upgrade`は未実装です。plugin自体の更新は次の正式手順で行います。
+行数・画面数・自動テストの有無だけで振り分けません。
+承認済みの可逆な修理は進め、重要な未決判断や未承認の副作用だけを確認します。
+資料にある決定を聞き直さず、今回必要な判断が解決したら質問を終えます。深いgrillingの依頼にも対応します。
 
-<a id="インストール済みpluginの更新"></a>
+現在状態から関係する仕様・コードを読み、理由や矛盾が必要なときだけ関連履歴を探します。
+全Sprintや全履歴を毎回読みません。既存の正本を使い、CONTEXT.mdや定型文書群を一括追加しません。
+現在状態は一つの文書を更新し、実装済み・検証済み・配備済みを分けます。過去詳細は履歴に保持します。
 
-### 既存pluginを0.5.5へ更新
+## 初期化・既存文書の移行
 
-利用中のhostと登録済みmarketplaceの取得元を確認し、対象だけ更新します。設定、既存guidance、作業中の変更は保持します。
+`/harness init` / `$using-harness init` は不足分だけを作り、既存文書を上書きしません。
+`check` は読取専用の導入確認です。独自配置の仕様や状態も再利用できます。
+これらの管理操作だけでは開発を開始しません。
 
-Claude CodeのCLIでは、既存の導入scope（user / project / local）を確認して実行します。
+plugin更新だけでは古いrepo指示は変わりません。`upgrade` は既存文書の候補確認から始めます。
+変更範囲をpreviewし、独自規則・dirty・未解決事項を保持して、承認済み範囲だけを適用します。
+元の内容は保管し、古い候補からの上書きや参照切れを検査します。
+
+```bash
+node /path/to/harness-plugin/scripts/harness.mjs upgrade --root /path/to/repo
+```
+
+必要時だけ [文書移行の手順](plugins/harness/skills/harness-loop/references/migration.md) を使います。
+初期化は全OSでNode writerを使い、対象repoへの依存installは不要です。
+
+## インストール済みpluginの更新
+
+公開版を更新する場合は、登録元marketplaceを更新して同じpluginを取得します。
+Claude Codeでは現在のscopeに合わせてください。
 
 ```bash
 claude plugin marketplace update yasashii-harness
@@ -66,89 +83,34 @@ claude plugin update harness@yasashii-harness --scope user
 claude plugin list --json
 ```
 
-上の`user`は既存scopeに合わせます。CodexのGitHub登録marketplaceは次で更新します。
-
 ```bash
 codex plugin marketplace upgrade yasashii-harness
 codex plugin add harness@yasashii-harness
 codex plugin list --marketplace yasashii-harness --json
 ```
 
-ローカルpathから登録しているCodex marketplaceはGit更新の対象外です。そのcheckoutのdirtyを保護して正式v0.5.5を取り込むか、正式tagの別checkoutを用意し、CLIのmarketplace管理で取得元を確認してから同じpluginを再導入します。cacheの中身は直接編集しません。
-両hostとも一覧と導入済みmanifestのversionが`0.5.5`になったことを確かめ、新しいセッションで使います。利用repoへのguidance一括上書きは行いません。
+ローカルpathで登録したmarketplaceはcheckoutを先に更新します。既存dirtyを保持し、cacheを直接編集しません。
+本checkoutの未公開候補と公開済みpluginは別です。導入済みversionと実内容を確認します。
 
-### 0.5.5: 承認済みの作業を、必要な確認で完了まで
+## モデル設定と検証
 
-通常ループを短くし、runtime・移行・特殊な失敗などの詳細は必要なときだけ参照します。小さな修正でも独立評価を保ち、既存検証の限定修理や意味の変わらない誤記訂正を進められます。初期化時の上書き禁止と、明示承認済みのguidance保守を区別しました。
+model/effortはhost継承が既定です。共有 `.harness/config.toml` と個人 `.harness/config.local.toml` の
+明示したleafだけを使い、モデル名を推測変換しません。本チャットのモデル設定は変更しません。
+roleの起動確認はhost metadataで確かめ、resolverの設定解決だけで起動成功を主張しません。
+詳細は必要な場合だけ [runtime](plugins/harness/skills/harness-loop/references/runtime.md)。
 
-### 0.5.4: 必要なときに深く聞くPlanner
+UIは実操作、CLI/APIは実行と入出力で確認します。必要検証後、新しい懸念がなければ全検査を繰り返しません。
+品質PASSと速度計測は区別し、未計測の高速化率は主張しません。
 
-Plannerが依頼と既存仕様からヒアリングの必要性を判断します。重要な曖昧さや矛盾があれば同梱のgrillingを使い、明確な依頼はそのまま進めます。省略や範囲判断に迷う場合はオーケストレーターへ相談します。やさしい版でも固定3問の制限を撤去し、答えやすい日本語で対話します。
+## 上流との同期
 
-Harness設定の説明は英語へ統一し、説明中の具体的なモデル名を外しました。個別の設定値は変わりません。
+上流本体は保持し、日本語の補足は宣言した追加節、配布識別はmetadata allowlistで扱います。
+README・positioning検査・LICENSEは下流所有です。
+同期時だけ [対応表](docs/upstream-mapping.md) と [手順](gentle-overlay/README.md) を使います。
 
-### 0.5.3: Lunaを追加定義なしで直接利用
-
-Codexでは、`gpt-5.6-luna`とeffortをnative `spawn_agent`のbuilt-in/default Agentへ
-直接渡します。Harness専用のcustom agent定義や、その定義を作るprovisioning scriptは配布しません。
-2026-08-17にCodex Desktop `0.148.0-alpha.9`、multi-agent v2でLuna/xhighの子Agentを
-起動し、child session metadataがmodel、effort、agent role `default`と一致することを確認しました。
-
-旧`hosts.codex.custom_agents`設定は、既存repoを止めないため読み取りますが、値が`true`でも
-`false`でもroutingには使わず、非推奨warningを表示します。既存設定やユーザー自身のAgent定義を
-削除する必要はありません。Lunaが起動前に拒否された場合は、設定済みのstrong Solを試し、
-それも拒否された場合は`inherit`へ戻ります。Terraは自動fallbackに使いません。
-
-### 0.5.2: Windowsでも安全に初期化
-
-Windowsでは、同じ事前検査を通したあと、Node.js自身が不足ファイルを書き込みます。
-WindowsにないPOSIXのディレクトリ実行bit `0o111`だけを判定から外し、read/write、
-`fs.accessSync`、symlink、ファイル種別、no-overwrite（既存ファイルを上書きしないこと）は
-これまでどおり確認します。既存の独自ガイダンス、旧JSON設定、`.gitignore`も保持します。
-macOS/Linuxは従来のBash initializerを維持します。
-
-保守者がWindows実機で確認するときは、`git`をPATHから利用できる状態で次を実行します。
-
-```powershell
-node scripts/check-windows-init.mjs --require-windows
-```
-
-引数なしの同じcheckはmacOS/Linuxでも共通ロジックを検査できます。`--require-windows`は
-Windows以外ではrunner判定だけが失敗するため、Windows実機の代替証跡にはなりません。
-
-## 何をしてくれるか
-
-- **企画（Planner）**: 短い指示から、大事な決めごとを選択式の質問で確認し、仕様とSprint計画に
-  展開します。重要な判断を勝手に決めて無人完走することは約束しません。
-- **実装（Generator）**: 1Sprint＝1機能ずつ実装し、合格した機能を守る自動チェックを育てます。
-- **検証（Evaluator）**: 実装とは独立に、実際にアプリを操作して合否を判定します。
-  証跡のない合格は無効です。同時に、rubricと契約に書いた証跡が揃えば合格に十分で、
-  既存検証の不具合は基準を変えない限定修理と独立再評価で対応できます（同Sprint 1回まで）。
-  条件を満たさない検証範囲の追加は、ユーザーに選択肢を返します。
-
-途中で止めても、`docs/spec.md` や `docs/sprints/state.md` などのファイルが正本として残るため、
-別の日に「続きから」で再開できます。
-
-## やさしさの範囲
-
-やさしさは、言葉遣い、3行報告、次の一手の提案にだけ加えます。Planner / Generator / Evaluator の
-分離、評価閾値、根拠、記憶保護、回帰ゼロ許容は緩めません。
-
-## 上流との関係
-
-技術的な詳細（Codexでのmodel routing、`.harness/config.toml` によるruntime設定、ブラウザ検証の
-方針など）は、上流の [Agentic Harness の README](https://github.com/mtaiseeei/agentic-harness#readme)
-と `docs/KNOWLEDGE.md` を参照してください。
-
-このリポジトリは上流の本文・skills・agents・runtimeロジックを書き換えません。やさしさ差分の
-管理方法は [gentle-overlay/README.md](gentle-overlay/README.md) を参照してください。
+記事のgrill-with-docsと同梱grillingは別実装です。出典とMIT Licenseは
+[grilling Skill](plugins/harness/skills/grilling/SKILL.md) と [設計背景](docs/KNOWLEDGE.md) に保持しています。
 
 ## ライセンス
 
-MIT（上流と同じ）
-
-### 承認済みの作業を完了まで進める
-
-合意した範囲では、実装後の修正と独立評価まで続けます。小さな変更の確認や記録は影響に合わせ、
-重要な製品判断・範囲外の追加・承認が必要な外部操作はユーザーに戻します。画面のないツールは
-コマンドや具体的な入力・出力で確認します。未検証を合格にはしません。
+MIT。詳細は [LICENSE](LICENSE)。

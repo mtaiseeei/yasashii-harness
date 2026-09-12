@@ -1,47 +1,39 @@
 ---
 name: grilling
-description: Deeply examine a plan, decision, or idea through dependent questions. Use when the user requests grilling or Harness Planner selects it after assessing unresolved product decisions; not automatically for every planning request.
+description: 既存資料を使い重要な未決事項を推奨案付きで質問し、決定を既存仕様へ反映する。明示的な深いgrillingにも対応する。単発修正で必須にはしない。
 ---
 
-## Harness adapter
+# 資料を使う質問
 
-Planner decides whether to use this Skill under [the planning gate](../../agents/planner.md#grilling-gate).
-The interview below is upstream text, unchanged; apply these Harness-specific boundaries when using it here:
+[PlannerのGrilling gate](../../agents/planner.md#grilling-gate)が必要性を判断する。
+現在の依頼・既決事項・明示委任を引き継ぐ。既存の現在状態と該当領域の仕様・コードから、
+既知 / 今回の変更 / 利用者に決めてほしい未決を整理する。資料で分かる事実は利用者に聞かない。
+履歴は矛盾や決定理由が必要な範囲だけ検索する。
 
-- Planner chooses the unresolved scope and existing canonical destinations under the user's instructions. Keep settled decisions and explicit delegation; record delegated assumptions, but never treat silence as delegation. Explore the agreed scope, not every possible product extension. Implementation details remain Generator's responsibility.
-- Prefer available host-native question UI (Claude Code `AskUserQuestion`, Codex structured user input) over the decorative format below. Respect each tool's availability and batch limits, splitting a frontier as needed; there is no total question cap. Without that UI, ask concise questions in chat. If a child role cannot ask, relay its questions and the user's answers through the orchestrator.
-- Use fact-finding subagents when available. Without them, read the relevant files/tools locally, or ask the orchestrator to relay the lookup. Missing tools do not authorize guessing user decisions. For doubtful scope or skipping, use the Planner gate's consultation path; ordinary Skill calls need no separate permission.
-- Confirm shared understanding of newly resolved decisions before finalizing the contract. Existing user approval or explicit delegation within that scope remains valid; do not reopen it just to repeat this confirmation.
+- 重要な未決に対し、根拠・推奨案・選択による影響を示して質問する。
+  先の回答に依存する質問は回答後に扱い、独立した少数の質問はまとめてもよい。
+- 既決事項を聞き直さず、委任済み実装詳細は自律判断する。沈黙を承認・委任とみなさない。
+- 利用可能なhost-native質問UIを使い、無ければ短い通常質問。子roleは親へ中継できる。
+  UIの件数制限を総質問数にしないが、質問数を増やすための探索もしない。
+- 回答が決まった時点で該当の既存仕様と判断理由を整合更新する。置換した判断に置換先を記す。
+  書き手が分離されていれば担当へ反映を渡す。CONTEXT.mdや新しい定型文書群は無条件に追加しない。
 
-## Upstream provenance
+**終了条件**: 今回を進めるうえで利用者が決める必要のある事項が解決したら終了する。
+全設計分岐を訪問する必要はない。確定内容を短く示し、既存承認で実装へ進めるなら再承認を要求しない。
+小変更や明確な依頼ではこのSkillを省略できる。
 
-- Source: [mattpocock/skills — grilling](https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/productivity/grilling/SKILL.md)
-- Revision: `3cca18b368ae95cdbdebbff572ccafa662551015`
-- Copyright (c) 2026 Matt Pocock. [MIT License](LICENSE).
-- Only discovery frontmatter and the Harness adapter above are local; the interview body below is verbatim.
+## 明示的に深く検討する場合
 
-<!-- upstream-body:start -->
-Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
+利用者が指定した範囲を、回答の依存関係に沿って深く検討する。
+必要なら[元の質問技法](references/upstream.md)を参照できるが、上の承認境界・終了条件が優先する。
+委任済みの詳細や範囲外の枝まで質問を続けない。
 
-Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+## 出典とローカル設計
 
-Format a round like so:
+この文書はHarnessのローカル実装。記事のgrill-with-docsを取り込んだものではない。
+記事は既存資料を活かす設計の参考にし、全面DDD工程や常時domain-modelingは採用していない。
+https://note.com/taki4416/n/nbbd9fb2bea78
 
-```
-❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
-
-➡️ <your recommended answer>
-
----
-
-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
-
-➡️ <your recommended answer>
-```
-
-Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
-
-Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
-
-The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
-<!-- upstream-body:end -->
+元のgrillingの本文は上記referenceに未改変で保管。通常の質問時に全文を読む必要はない。
+Source: https://github.com/mattpocock/skills/blob/3cca18b368ae95cdbdebbff572ccafa662551015/skills/productivity/grilling/SKILL.md
+Revision: `3cca18b368ae95cdbdebbff572ccafa662551015`。Copyright (c) 2026 Matt Pocock、[MIT License](LICENSE)。

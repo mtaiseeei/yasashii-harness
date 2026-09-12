@@ -1,57 +1,44 @@
-# Features
+# 開発の進め方と文書
 
-## RT-001 Native Codex dispatch
+## FLOW-001 影響に応じた実行
 
-Codex roleの解決済みmodelが`gpt-5.6-luna`であっても、他の明示modelと同じくbuilt-in/default Agentへ
-model / effortを直接渡す。Harnessが`agent_type: harness_luna_worker`を要求したり、global定義の存在を
-起動条件にしたりしない。
+小変更は影響範囲、可逆性、外部契約、データ、権限、失敗時影響で判断する。小さな挙動変更も対象で、
+行数・画面数・既存自動テストの有無を硬い資格条件にしない。担当Agentが直接修正・必要検証して完了でき、
+独立レビュー、micro契約、3役、3文書、専用Sprint開始を必須にしない。既存管理repoでも同じである。
 
-resolverが返すdirect dispatch契約は、解決済みの正確なmodel / effortを保持する。値を別名へ変換せず、
-起動後のmetadataと一致した場合だけ`launch-verified`と扱う既存ルールを維持する。
+通常機能は必要な短い計画を置き、完成時に実装者とは独立したレビューを行う。高リスク変更は既存の
+実行前確認、承認境界、実行後検証を維持する。大きく曖昧な開発では必要な設計文書と意味のある単位を使う。
+承認済み範囲の可逆な実装判断・修理を自律的に進め、同じ承認を聞き直さない。沈黙は承認にならない。
 
-## RT-002 Legacy custom-agent設定の互換読込
+## DOC-001 現在状態と条件付き読取
 
-共有または個人設定に旧`hosts.codex.custom_agents`が残っていても、runtime解決を失敗させない。
-その設定はroutingへ影響しない非推奨入力として無視し、warningには少なくとも次を含める。
+AGENTS / CLAUDEは短い常設境界、基本コマンド、条件付き入口を置く。stateの正本は一つとし、
+現在の目的、進行中作業、未解決事項、次の一手、有効な承認・制約、必要仕様への参照、
+直近検証の対象版と証拠参照を保持する。実装済み・検証済み・配備済みを区別する。
 
-- 非推奨となった設定path
-- custom agent経路を使わないこと
-- 実効経路がnative direct dispatchであること
-- ユーザーが既存設定やAgent定義を削除しなくても動作すること
+stateは現在状態を更新し、過去詳細を履歴へ保持する。50行程度 / 数KBは初期目安で停止ゲートではない。
+巨大な一行を見逃さず、短縮のため未解決事項や有効な承認・制約を落とさない。
+state / NEXT_SESSION / PROJECTへ同じ現在状態の正本を増やさない。
 
-新規初期化テンプレートには、この旧設定を生成しない。
+開始・再開は現在状態→該当仕様 / コード→矛盾や理由が必要な場合だけ関連履歴の順。
+既存repoの正本と規約を利用し、CONTEXT.mdや定型文書群を無条件追加しない。
+領域別の現行仕様を必要な分だけ読み、索引を短くする。分割後も全fileを毎回読む指示は置かない。
+重要判断の確定時は該当仕様と判断履歴を整合更新し、置換済み判断を識別できるようにする。
 
-## RT-003 Availability fallback
+## ASK-001 資料を使う質問
 
-子Agent作成前の同期的な`Unknown model`としてLunaが拒否された場合だけ、既存のavailability fallbackを使う。
-通常Generatorは設定済みのstrong Solへfreshに切り替え、Solも同様に拒否された場合はmodel / effortを
-`inherit`へ戻してwarningを出す。Planner / Evaluatorで拒否された項目も既存契約どおりその項目だけ
-`inherit`へ戻す。
+既存資料から既知事項・今回の変更・未決事項を把握し、推奨案を添えて重要な質問だけ行う。
+今回を進めるため利用者が決める必要のある事項が解決した時点で質問を終了し、確定内容を既存仕様へ反映する。
+全設計分岐の訪問、既決事項の聞き直し、委任済み実装詳細の確認を必須にしない。
+単発修正にgrillingは必須ではない。明示的な深いgrillingは引き続き利用できる。
 
-実装失敗、テスト失敗、timeout、通信エラー、子作成有無が不明な失敗をlaunch rejectionとして扱わない。
-Terraとshell-levelの`codex exec`は自動fallbackに使わない。
+記事のgrill-with-docsは設計参考であり、同梱mattpocock/skills grillingと同一実装と説明しない。
+外部実装を取り込む場合はsource / license / provenanceを検証する。
 
-## DIST-001 配布物の単純化
+## MIG-001 既存repoの保守移行
 
-配布pluginは、Harness専用Luna custom agentの定義を検査・生成・provisionするコードや利用手順を含めない。
-初期化されたconfig、AGENTS / CLAUDEガイダンス、Harness Skillもcustom agentの作成や選択を要求しない。
-
-過去の設計記録を残す場合は、現在も推奨される手順に見えないよう、廃止済みの歴史的記録であることを明記する。
-
-## DOC-001 実行面の説明
-
-README、設計知識、routing提案、配布ガイダンスの現在形を整合させる。
-少なくとも次の観測事実を、resolverの机上結果ではなくhost metadataで確認済みの実起動として記録する。
-
-- 確認日: 2026-08-17
-- 実行面: Codex Desktop `0.148.0-alpha.9`、multi-agent v2
-- dispatch: built-in/default Agent、model `gpt-5.6-luna`、effort `xhigh`
-- child session: `01a00c9a-94b4-78c3-9398-6361f49d9f69`
-- child metadata: model `gpt-5.6-luna`、effort `xhigh`、agent role `default`
-
-古いAppでLunaが`Unknown model`だった記録は当時の履歴として区別できるが、現在の対応状況として表示しない。
-
-## REL-001 配布versionの整合
-
-runtime挙動と配布内容が変わるため、次のpatch versionへ進める。すべてのversion正本を同じ値にし、
-今回の土台である`0.5.2`の次を`0.5.3`とする。
+plugin更新とrepo guidance移行を区別し、安全にpreviewして変更範囲を確認できる実行手段を配布する。
+初期化はno-overwriteを維持する。保守移行では承認済み対象に限定して更新し、元履歴、独自規則、dirtyを保持する。
+既存正本の利用、参照切れ、未解決事項の脱落、対象範囲にある旧指示の残存を必要な範囲で確認する。
+機械的に安全と判断できない箇所は残して報告し、黙って削除・要約・更新完了扱いにしない。
+preview後に対象が変化した場合も、確認していない内容を古いpreviewで上書きしない。

@@ -4,14 +4,14 @@
     "name": "taisei"
   },
   "metadata": {
-    "description": "短い指示を入口に、3 role・ファイル正本・Sprint・独立評価で大きな開発を継続するハーネス駆動開発プラグイン。",
+    "description": "目的・決定・現在地を継承し、変更の影響に応じた自律実装・設計・検証を支える開発ハーネス。",
     "version": "0.5.5"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
-      "description": "File-backed, multi-sprint harness for long-running development with separate Planner, Generator, and Evaluator roles.",
+      "description": "目的・決定・現在地を継承し、小変更は直接完了、通常機能は短い計画と独立レビューで進める開発ハーネス。",
       "version": "0.5.5",
       "author": {
         "name": "taisei"
@@ -19,7 +19,15 @@
       "repository": "https://github.com/mtaiseeei/yasashii-harness",
       "license": "MIT",
       "category": "development",
-      "tags": ["harness", "planner", "generator", "evaluator", "agentic", "tdd", "ai-orchestration"]
+      "tags": [
+        "harness",
+        "planner",
+        "generator",
+        "evaluator",
+        "agentic",
+        "tdd",
+        "ai-orchestration"
+      ]
     }
   ]
 }

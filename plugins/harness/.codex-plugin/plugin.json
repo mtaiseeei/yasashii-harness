@@ -1,7 +1,7 @@
 {
   "name": "harness",
   "version": "0.5.5",
-  "description": "A file-backed, multi-sprint harness for long-running development, with separate Planner, Generator, and Evaluator roles.",
+  "description": "目的・決定・現在地を引き継ぎ、小変更の直接完了から大きな開発の設計・独立評価まで支えるClaude Code / Codex向け開発ハーネス。",
   "author": {
     "name": "taisei",
     "url": "https://github.com/mtaiseeei"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Agentic Harness",
-    "shortDescription": "Keep long-running development moving through file-backed sprints and independent evaluation.",
-    "longDescription": "Agentic Harness starts from a short instruction and keeps substantial development moving across sessions. Three separate roles cover planning, generation, and independent evaluation; spec, sprint state, progress, and feedback files preserve the source of truth. When the host supports multiple agents, Harness uses them; otherwise it preserves role separation through independent work units. Use it for a new service, a business system, or the next sprint in an existing repository.",
+    "shortDescription": "目的と決定を継承し、影響に応じて自律開発を進める",
+    "longDescription": "小さな挙動変更は直接修正・必要検証で完了。通常機能は短い計画と完成時独立レビュー、大きな開発は必要な仕様とSprintで進めます。既存資料と現在状態を引き継ぎ、重要な未決事項だけを確認します。",
     "developerName": "taisei",
     "category": "Productivity",
     "capabilities": [
@@ -29,8 +29,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use Agentic Harness for this short new-service idea: make a file-backed multi-sprint plan and start the first sprint.",
-      "Continue this existing repository from docs/sprints/state.md with separate Planner, Generator, and Evaluator roles."
+      "作りたいアプリを、必要な設計と検証を行って完成まで進めてください。",
+      "既存repoの現在状態と該当仕様から依頼を進め、変更の影響に応じた検証をしてください。"
     ]
   }
 }

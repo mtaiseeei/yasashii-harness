@@ -1,19 +1,14 @@
-# Spec Index
+# 現行仕様への索引
 
-Agentic Harnessの保守変更の正本インデックス。Sprint 001はCodex model routingの
-native direct dispatchへの一本化、Patch 001はPlannerによる必要時のgrilling利用を扱う。
+現在地は [state](sprints/state.md)。必要な領域だけを読み、全仕様・全Sprint・全履歴を開始条件にしない。
 
-## 必読
+- [製品目的](spec/product.md): 目的・対象・対象外が必要なとき。
+- [開発の進め方と文書](spec/features.md): 変更分類、再開、質問、保守移行を変更するとき。
+- [保護境界](spec/constraints.md): 権限、初期化、dirty、runtime、配布を扱うとき。
+- [Runtime](spec/runtime.md): model / effort解決・dispatchを扱うとき。
+- [今回の評価基準](spec/rubric.md): Sprint 003の独立評価時。
+- [判断記録](spec/decisions.md): 現行判断の理由や置換関係を確認するとき。
 
-- [Product](spec/product.md) — 対象、目的、成功状態、対象外
-- [Features](spec/features.md) — 配布時の振る舞いと互換性
-- [Constraints](spec/constraints.md) — fallback、安全境界、配布上の不変条件
-- [Evaluation Rubric](spec/rubric.md) — 合否基準と証拠のsafe harbor
-
-## 実行契約
-
-- [Sprint 001](sprints/sprint-001.md) — native Luna direct dispatchへの一本化
-- [Sprint 001 Patch 001](sprints/sprint-001-patch-001.md) — Plannerが必要性を判断してgrillingを利用する
-
-Patch 001の振る舞い・対象外・受け入れ基準は上記Patch契約を正本とし、採点にはrubricの
-Patch専用節を使う。Sprint 001の過去の契約・採点基準は変更しない。
+今回の実装契約は [Sprint 003](sprints/sprint-003.md)。進捗・状態をこの索引へ複製しない。
+過去の契約・評価は履歴として保持し、矛盾や理由の調査時に該当範囲だけ検索する。
+過去の採点を確認する場合は [過去rubric](spec/rubric-history.md) を使う。
