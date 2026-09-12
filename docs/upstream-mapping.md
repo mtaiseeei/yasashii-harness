@@ -131,3 +131,7 @@ scripts/check-windows-init.mjs
 - syncは全対象事前検査でdirty・削除・symlinkを保護し、候補経路と正式固定SHA経路を区別する。
 - 初回独立確認のREADME不整合を修正し、限定修理と独立再評価、条件外のユーザー判断を両版で揃えた。
 - 導入済みcacheや利用repoの設定・guidanceを一括変更しない。詳しい変更はdocs/releases/v0.5.5.md、やさしい版の更新コマンドはREADME.mdの「既存pluginを0.5.5へ更新」を参照。
+
+### A-16: Bash 3.2の引数なし管理回帰
+
+正式固定SHAの引数なし回帰で、`set -u`と空配列転送が組み合わさり`SYNC_ARGS[@]: unbound variable`となる不具合を検出した。引数がある場合だけ配列を展開するBash 3.2対応表記へ直し、空引数・空白入り引数の保持を実行確認した。合否条件・期待結果・証拠要件は変更しない、Sprint内1回の既存検証限定修理として扱う。
