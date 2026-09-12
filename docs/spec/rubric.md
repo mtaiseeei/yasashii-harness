@@ -1,68 +1,32 @@
-# Evaluation Rubric
+# Sprint 003 評価基準
 
-## 対象種別
+今回のplugin全体の挙動変更には独立Evaluatorによる実行評価を行う。
+将来の小変更にこの評価手順・契約・文書群を必須化しない。
 
-画面を持たないCLI / plugin runtimeの保守変更。視覚デザインや独自性は採点しない。
-以下の既存基準・シナリオは`sprint-001`用。`sprint-001-patch-001`には末尾の専用節を適用する。
+## 合格条件
 
-## 合否基準
+| 対象 | 合格に必要な結果 |
+|---|---|
+| 変更分類 | smallは挙動変更でも直接完了、通常機能は短い計画と完成時独立評価、高リスクは承認境界と実行後検証を維持 |
+| 文書と再開 | 現在状態→該当仕様 / codeが成立し、全履歴読取・複数の現在状態正本・state無限追記を要求しない |
+| 質問 | 既決事項を再質問せず、必要な利用者判断が解決したら停止し、決定を既存仕様へ反映 |
+| 保守移行 | CLIのpreviewと実適用が確認でき、履歴・独自規則・dirty・未解決事項を保護し、対象旧指示と参照を確認できる |
+| 配布整合・回帰 | 現行入口、role、Skill、templates、docsが主要経路で矛盾せず、指定既存回帰が成功。下流固有識別を維持 |
 
-| 基準 | 閾値 | 5点 | 4点 | 3点以下 |
-|---|---:|---|---|---|
-| 機能完全性 | 4/5 | native Luna、legacy警告、fallback、配布撤去、version整合をすべて満たす | 主要経路をすべて満たし、非本質的な説明上の不足だけがある | custom agent依存または主要要件が残る |
-| 動作安定性 | 4/5 | runtime config回帰が全件greenで既存role routingも保たれる | 対象経路と主要既存経路がgreen | resolverや初期化の既存経路に失敗がある |
-| 互換性・安全性 | 5/5 | 旧設定を停止せず警告付きで無視し、ユーザー所有物へ書き込まず、Terraも選ばない | 該当なし | いずれかの安全境界を破る |
-| 文書正確性 | 4/5 | 現行配布面が整合し、2026-08-17の証拠と過去記録を明確に区別する | 利用者の判断に影響しない軽微な表現差だけがある | staleなApp制約やcustom agent推奨が現在形で残る |
-| 回帰なし | 5/5 | 指定された全回帰コマンドが成功する | 該当なし | 1件でも失敗する、または実行不能 |
+主要要件が欠ける場合は不合格。利用者の判断や保護境界を変えない説明上の軽微な改善は任意とし、
+評価途中で新しい合格条件を追加しない。findingは product / verification-infra を区別する。
 
-1基準でも閾値未満なら不合格とする。
+## 十分な証拠
 
-## 必須シナリオ
+- Sprint 003の代表シナリオに対し、独立Evaluatorが実際の配布指示から出した判断・読取範囲・停止条件の記録。
+  合成入力・模擬回答であることを明示する。routing語の文字列一致だけで合格としない。
+- 合成repoで保守移行CLIを実行し、preview前後と適用後の差分・保護対象・参照・未処理報告を確認した記録。
+- `node scripts/check-positioning.mjs`、`node scripts/check-loop-rules.mjs`、
+  `node plugins/harness/scripts/check-runtime-config.mjs`、追加した対象回帰の終了コードと要約。
+- 変更対象JSON manifestの `python3 -m json.tool`、利用可能なら `claude plugin validate plugins/harness` と
+  隔離local marketplace install。後二者が利用不能な場合は理由を記録し、それだけで不合格にしない。
+- 対象版（commitと必要なら作業差分）と証拠への参照。Agentic / Yasashiiの実装・検証・同期・未配備を区別する。
 
-1. Luna / xhighを明示したCodex roleが`mode: direct`、Luna model override、xhigh effortを返し、custom agent定義を要求しない。
-2. 旧`hosts.codex.custom_agents.enabled = true`と`false`のどちらも解決処理を止めず、値に関係なくdirect経路となり、非推奨warningが出る。
-3. 新規初期化configに`hosts.codex.custom_agents`が作られない。
-4. Lunaの同期的な起動前拒否でstrong Solへfresh fallbackし、Solも拒否された場合は`inherit`になり、Terraは選ばれない。
-5. 配布物にHarness専用Luna Agentを検査・作成する実行コードがなく、現在形のガイダンスからprovision手順が消えている。
-6. version正本が`0.5.3`で同期している。
-
-## 証拠のsafe harbor
-
-次の証拠が揃えば合格判定に十分であり、新しいcollector、attestation、統一証拠schemaは要求しない。
-
-- `node scripts/check-positioning.mjs`の終了コードと要約
-- `node scripts/check-loop-rules.mjs`の終了コードと要約
-- `node plugins/harness/scripts/check-runtime-config.mjs`の終了コードとテスト件数
-- `python3 -m json.tool`による変更対象JSON manifestの構文確認結果
-- `rg`または同等のread-only検索による、配布面にprovision用scriptや現在形のcustom-agent案内が残っていない確認
-- resolver回帰内で、必須シナリオ1〜4に対応する入力と出力のassertionが成功した記録
-- 2026-08-17の実起動については、既に提示されたchild session IDとhost metadataの記録
-
-`claude plugin validate plugins/harness`と隔離Marketplace installは、現在の環境で利用可能なら行う追加確認とする。
-未実施だけを理由に不合格にしない。
-
-## Sprint 001 Patch 001 — Planner / grilling
-
-適用対象は`sprint-001-patch-001`のみ。過去Sprintの基準を遡及変更しない。
-
-| 基準 | 閾値 | 合格アンカー | 不合格アンカー |
-|---|---:|---|---|
-| 機能完全性 | 4/5 | 呼ぶ・省略・限定確認・判断の相談を使い分け、必要時は同梱grillingに従い判断の依存関係を掘り下げる | 常時呼ぶ、重大な未決事項を推測で埋める、同梱Skillに接続しない |
-| 動作安定性 | 4/5 | 実際の配布指示を使った独立roleの行動確認で主要経路が成立し、host能力不足時も意思決定を保留・伝達できる | 質問UIやSkill呼び出しの不可用を理由に重要判断を代行する |
-| 意思・責務の保持 | 5/5 | 明示指示と既決事項を優先し、Plannerが未決範囲と既存規約に沿う保存先を決め、orchestratorへの相談もユーザー判断を捏造しない | 無断のscope拡張、合意の作り直し、重要判断の無断代行がある |
-| 配布・文書正確性 | 4/5 | upstream本文・出典・licenseを配布し、Harness接続指示と区別する。現行案内に固定3問・無条件ヒアリングとの矛盾がない | 出典またはlicense欠落、host未対応の呼び出しのみ、現行案内の矛盾が残る |
-| 回帰なし | 5/5 | 指定した既存回帰がすべて成功し、既存runtime・初期化の境界を保つ | 既存回帰が失敗する、または保護された設定・routingを変える |
-
-4点の行は、主要経路を満たし利用者の判断を変えない説明上の軽微な不足だけを許容する。
-全項目を満たせば5点。1項目でも閾値未満なら不合格。
-
-### Patch専用の証拠のsafe harbor
-
-- Patch契約の必須シナリオに対し、実際の同梱指示を読んだ独立roleが出した要否判断・質問・相談・保存先判断の記録。模擬のユーザー回答は模擬と明記する。
-- 同梱upstreamの参照元・revision・本文差分・licenseの確認、および配布manifest/Skill参照の確認。
-- `node scripts/check-positioning.mjs`、`node scripts/check-loop-rules.mjs`、`node plugins/harness/scripts/check-runtime-config.mjs`の終了コードと要約。
-- 変更対象JSON manifestがあれば`python3 -m json.tool`の結果、利用可能なSkill検証の結果、現行案内の整合を確認したread-only検索結果。
-
-`claude plugin validate plugins/harness`と隔離Marketplace installは利用可能なら追加確認する。
-未実施だけで不合格にしない。ブラウザ、外部live環境、両hostの実インストール、専用評価基盤は要求しない。
-判定は上記の証拠で足りる。各findingは`product` / `verification-infra`に分類する。
+再評価は修正箇所と影響範囲を対象とし、有効な既存証拠を再利用する。ブラウザ、専用benchmark基盤、
+両hostへの本番導入、新collectorやattestationは要求しない。品質PASSは速度実測を意味しない。
+同host / model条件の比較が実行可能なら少数例で行い、未計測なら高速化率を主張しない。

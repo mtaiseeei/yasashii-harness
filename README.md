@@ -1,16 +1,18 @@
 # agentic-harness
 
-Agentic Harness は、企画・実装・独立評価・状態遷移を **Planner / Generator / Evaluator の3 role**、
-ファイル正本、Sprint でつなぐ Claude Code / Codex 向け開発ハーネスです。
-単発の自動実装で終わらず、新規サービス、中小企業にとって大きな業務システム、
-既存repoの継続改修など、1回の依頼では安全に完結しない開発を複数Sprintに分けて進めます。
+Agentic Harnessは、目的・決定・現在地を引き継ぎ、必要な設計と検証で開発を進めるClaude Code / Codex向けpluginです。
+初回から堅い実装を支えながら、小変更は担当Agentが自律的に完了できます。
+入力の短さは始めやすさであり、開発規模の上限ではありません。
 
-> ハーネス駆動開発（harness-driven development）を、どのリポジトリにも差し込める
-> クリーンなプラグインとしてまとめたものです。
+| 変更 | 進め方 |
+|---|---|
+| 小さく可逆な修正（小さな挙動変更を含む） | 直接修正・必要検証で完了。計画・独立レビュー・micro契約は必須ではない |
+| 通常の機能追加 | 必要な短い計画 → 実装・必要検証 → 完成時の独立レビュー |
+| 移行・権限・本番重要操作等の高リスク変更 | 実行前に対象・影響・復旧方法と承認を確認し、実行後検証・独立レビュー |
+| 大きく曖昧な開発 | 必要な領域仕様で設計し、意味のある単位のSprintで進行 |
 
-「3」は固定のSubagent実体数ではなく、分離するrole数です。ホストが対応する場合は複数Agentを活用し、
-対応しない場合もroleごとの独立作業単位として実行します。GeneratorとEvaluatorは常に分離し、
-会話ではなく spec / state / progress / feedback を正本にして開発を再開します。
+行数・画面数・自動テストの有無だけで分類せず、影響範囲・可逆性・外部契約・データ・権限・失敗時影響を見ます。
+承認済みの可逆な実装判断や修理は進め、重要な未決判断や未承認の副作用だけを確認します。
 
 ## インストール
 
@@ -57,7 +59,7 @@ codex plugin add harness@agentic-harness-local
 ```
 
 Codex では `AGENTS.md` をプラグインから上書きせず、`using-harness` skill が会話から起動して、
-no-overwrite 初期化と `harness-loop` へ進みます。普段は「〇〇なアプリを作って」と普通に会話してください。
+変更の影響に応じて直接修正または `harness-loop` へ進みます。必要な初期化はno-overwriteです。普段は「〇〇なアプリを作って」と普通に会話してください。
 明示的に始めたい場合だけ `$using-harness` または `$harness-loop` を指定します
 （`/harness` コマンドは Claude Code 専用で、Codex には配布されません）。
 
@@ -89,85 +91,53 @@ cache内のファイルを直接編集せず、設定、導入scope、既存repo
 
 ## 使い方
 
-普段の会話で、1〜数行の指示から始められます。入力の短さは始めやすさであり、開発規模の上限ではありません。
+普通に「アプリを作って」「この機能を直して」と依頼できます。[using-harness](plugins/harness/skills/using-harness/SKILL.md)が入口です。
 
 ### 短い新規開発の例
 
-> 地域工務店向けの見積・工程管理サービスを作って。
-
-Plannerが対象業務や最初に作り込む体験を選択式で確認し、specと複数Sprintへ展開します。
-ユーザーの重要判断を飛ばして無人完走することは約束しません。
+「社内の備品予約アプリを作って。予約の重複を防ぎたい」
+既存資料から分かることは調べ、利用者が決める必要のある未決だけを推奨案付きで質問します。
+今回必要な判断が解決したら実装へ進み、全設計分岐の質問を続けません。
 
 ### 既存repoを継続する例
 
-> この既存業務システムの `docs/sprints/state.md` から、次のSprintを進めて。
+「一覧の表示順を直して」なら影響に必要な確認を行って直接完了できます。
+「予約の承認機能を追加して」なら短い計画と完成時の独立レビューで進めます。
+既存の現在状態 → 該当仕様・コード → 理由や矛盾が必要な場合だけ関連履歴、の順に読みます。
+全Sprint/全履歴の照合、CONTEXT.mdや定型文書群の一括追加は行いません。
 
-正本のCurrent ID、Sprint契約、progress、feedbackを照合し、合格済みの条件を回帰チェックで守りながら再開します。
+### 初期化と既存repoの文書移行
 
-Claude Codeで明示的に始めたい場合は `/harness <短い指示>`、Codexでは `$using-harness` または
-`$harness-loop` を使えます。通常会話から始める場合には、いずれも必須ではありません。
-
-### 開発を始めずに初期化・確認する
-
-新しいrepoへHarnessの雛形だけを安全に配置する場合は、次を使います。
-
-| 目的 | Claude Code | Codex |
-|---|---|---|
-| no-overwriteで初期化 | `/harness init` | `$using-harness init` または「Harnessを初期化して」 |
-| 導入状態をread-onlyで確認 | `/harness check` | `$using-harness check` または「Harnessの導入状態を確認して」 |
-
-`init`と`check`はPlannerやSprintは開始しません。`init`は既存の`AGENTS.md`、`CLAUDE.md`、Harness設定、
-Agent定義を上書きせず、不足ファイルだけを作ります。書き込み前に全出力先のsymlinkとファイル種別を検査し、
-危険な衝突があれば何も変更しません。`check`は`present` / `missing` / `would-update` / `preserved` /
-`warning` / `unsafe`を報告するだけで、ファイルを変更しません。
-
-plugin同梱CLIを直接使う場合は次の形です。対象repoにpackage installは不要で、`package.json`、lockfile、
-`node_modules`も作りません。
+`/harness init` / `$using-harness init` は不足分だけno-overwrite生成し、`check` は読み取り専用の導入確認です。
+既存正本を利用し、新規でも短い仕様索引と現在状態から始めます。詳細仕様は必要になった領域だけ作ります。
+独自配置では `--spec-path` / `--state-path` で既存正本を指定できます。
 
 ```bash
-node /path/to/harness-plugin/scripts/harness.mjs init --root "$(pwd)"
-node /path/to/harness-plugin/scripts/harness.mjs check --root "$(pwd)"
+node /path/to/harness-plugin/scripts/harness.mjs init --root /path/to/repo
+node /path/to/harness-plugin/scripts/harness.mjs check --root /path/to/repo
+node /path/to/harness-plugin/scripts/harness.mjs upgrade --root /path/to/repo
 ```
 
-`check`の終了コードは、`0`が初期化済み、`1`が安全に補える不足あり、`2`がunsafeまたは引数不正です。
-既存ファイルが最新版かどうかを判定する機能と`upgrade`は、誤ってrepo固有のルールを置換しないよう別機能とし、
-現在は未実装です。
+plugin更新だけでは古いrepo指示は変わりません。`upgrade` は文書保守のpreviewから開始し、
+対象差分、独自規則、dirty、未解決事項を確認して、承認済み範囲の候補だけを適用できます。
+元の内容は保管し、古いpreviewからの上書きや参照切れを検査します。
+[候補作成・適用手順](plugins/harness/skills/harness-loop/references/migration.md)を必要なときだけ使ってください。
+初期化・導入確認だけでは開発を開始せず、更新時に消費repoを自動移行しません。
+対象repoへの依存installは不要。初期化の安全確認とNode writerはmacOS/Linux/Windowsで共通です。
 
-Windowsでは、ディレクトリの検索可否を表さないPOSIX実行bit `0o111`だけを事前判定から外します。
-read/write bit、Node.jsの`fs.accessSync`、symlink・ファイル種別・no-overwriteの検査は他OSと同じです。
-事前判定後の書き込みはNode.js自身が行うため、Windows sandbox内でMSYSの`mkdir`や`cp`だけが拒否される
-環境でもGit Bashの書き込み権限に依存しません。macOS/Linuxは従来のbash initializerを維持します。
-保守者がWindows実機で初期化回帰を確認する場合は、`git`をPATHから利用できる状態で次を実行します。
+## 現在地と設計の継承
 
-```powershell
-node scripts/check-windows-init.mjs --require-windows
-```
+AGENTS.md/CLAUDE.mdは短い常設境界・基本コマンド・条件付き入口です。
+既存repoは既存の仕様と現在状態を使います。既定の `docs/sprints/state.md` は目的、進行中作業、未解決事項、
+次の一手、承認範囲、必要仕様、直近検証の対象版と証拠への参照を持ちます。
+実装済み・検証済み・配備済みを分け、続報を無限追記せず現在内容を更新します。過去詳細は履歴へ保持します。
+50行程度・数KBは初期の目安であり、公式値や停止ゲートではありません。有効な制約や未解決事項を落としません。
+state/NEXT_SESSION/PROJECTに同じ現在状態の正本を増やしません。
 
-## 開発全体を継続する仕組み
-
-1. **Planner** がアイデアを短い `docs/spec.md`、詳細 `docs/spec/*.md`（採点 rubric を含む）、
-   `docs/sprints/` のスプリント契約に展開
-2. **Generator** が 1スプリント＝1機能ずつ実装し、自動回帰チェックを資産化しながら、
-   対応する `docs/progress/sprint-*.md` に自己評価
-3. **Evaluator** が実際に操作してテストし、証跡付きで対応する `docs/feedback/sprint-*.md` に合否
-4. オーケストレーターが結果を `docs/sprints/state.md` に記録してから遷移。
-   不合格なら Generator に差し戻し、仕様欠陥なら Planner へ。
-   検証基盤側の `verification-scope-issue` は、期待結果・合否条件・証拠要件を変えず、新規基盤を増やさない
-   既存検証の局所修理に限り、同一Sprintで1回だけ Generator が修理し、Evaluator が独立再評価する。
-   再失敗・修理範囲不明・要求拡大など、この条件に収まらない場合は選択肢付きでユーザーへ返す
-   （詳細は[scope](plugins/harness/skills/harness-loop/references/scope.md)）。合格なら次スプリントへ。
-   同一スプリント3回連続不合格、spec-issue 差し戻しの上限、系譜あたりの dispatch 予算
-   （Lineage Dispatches）到達はユーザーにエスカレーション
-
-このループはenterprise規模、期間、品質結果を保証するものではありません。開発を続けられる正本と品質gateを用意し、
-重要判断と同一Sprintの3回連続失敗はユーザーへ戻します。
-
-```
-Planner ──→ Generator ──→ Evaluator
- (企画)       (実装)         (検証)
-               ▲                │
-               └─── 不合格時 ───┘
-```
+通常機能は短い計画とレビュー結果で足ります。大きな開発ではPlanner / Generator / Evaluatorの役割を分け、
+仕様・Sprint契約、実装・progress、独立評価・feedbackを必要な長さで残します。
+ホストがsubagentに対応しない場合は独立作業単位を使い、実装者の自己評価を独立確認とは扱いません。
+独立確認できない項目は未確認として残します。enterprise規模、期間、品質結果を保証するものではありません。
 
 ## Agent runtime設定
 
@@ -305,134 +275,34 @@ model / effortを確認できた場合だけ使います。host側証拠を取�
 `dispatch-attempt`は受け渡し面だけ確認でき、値の利用可否を実role起動で確かめる状態です。これも実起動の証明では
 ありません。実装失敗、子Agentのcrash、timeout、通信エラーは起動拒否として扱わず、自動で別modelを重複起動しません。
 
-## 構成要素
+## 配布と検証
 
-| 構成要素 | 役割 |
-|---|---|
-| `agents/planner.md` | Planner role。「何を作るか」を仕様とSprint契約に展開 |
-| `agents/generator.md` | Generator role。1Sprintずつ実装し、自動回帰チェックを育てる |
-| `agents/evaluator.md` | Evaluator role。Generatorと分離し、実物を証跡付きで評価する |
-| `skills/using-harness` | 通常入口。会話からハーネス利用を判断し、初期化して `harness-loop` に進む |
-| `skills/harness-loop` | オーケストレーションの脳。書き込み権限・閾値・絶対ルール・手順 |
-| `scripts/harness.mjs` | `init` / `check` の安全な管理CLI。初期化だけ、read-only確認だけを実行 |
-| `scripts/resolve-runtime-config.mjs` | 共有＋個人設定、host能力、lifecycle actionを解決して実効値を表示 |
-| `commands/harness.md` | `/harness` — 明示起動用ショートカット |
-| `hooks/` | Claude Code の SessionStart で `using-harness` を additionalContext として注入 |
-| `templates/` | 取り込み先リポジトリ用の `CLAUDE.md` / `AGENTS.md` no-overwrite テンプレート |
-| `.codex-plugin/plugin.json` | Codex 用プラグイン manifest |
-| `.agents/plugins/marketplace.json` | Codex 用 repo marketplace |
+Claude Codeはagents/commandsと短いSessionStart hook、Codexはskillsの発見から入口へ進みます。
+hookは文書を書かず、Skill本文も一括注入しません。共通の指示・script・parser・licenseをplugin内に同梱します。
 
-### 書き込み権限の責務分離
+UIは利用可能なブラウザで実操作、CLI/API/pluginはコマンドと入出力を確認します。
+Playwright MCPは既設の場合だけ利用でき、必須依存ではありません。
+再評価は修正箇所と影響範囲中心。必要な検証が済み、新しい懸念がなければ全検査を反復しません。
 
-| ファイル | 書き手 |
-|---|---|
-| `docs/spec.md` | Planner のみ |
-| `docs/spec/*.md`（`rubric.md` を含む） | Planner のみ |
-| `docs/sprints/state.md` | オーケストレーター（メインエージェント）のみ |
-| `docs/sprints/sprint-NNN.md` | Planner のみ |
-| `docs/sprints/sprint-NNN-patch-PPP.md` | Planner のみ |
-| `docs/progress/sprint-*.md` | Generator のみ |
-| `docs/feedback/sprint-*.md` | Evaluator のみ |
+品質PASSと速度実測は分けて報告します。完了時間・読取量・質問数・手戻りを改善指標とし、
+未計測の高速化率は主張しません。公開、下流同期、installed更新はそれぞれ対象版と実施結果で区別します。
 
-`docs/spec.md` は長い仕様本文ではなく、読むべき詳細仕様を示す短い正本インデックスです。
-進行状態（Current ID、各スプリントの Status:
-planned/active/awaiting-eval/done/done-by-user-decision/deferred/superseded、
-Retry Count、Spec-Issue Count、Lineage Dispatches）は `docs/sprints/state.md` が正本で、
-サブエージェントではなくオーケストレーターだけが
-更新します（旧形式の `docs/sprints/current.md` は初回に state.md へ変換して参照専用にします）。
-`done-by-user-decision` は、ユーザーが残余リスクを明示的に引き受けて完了とした状態で、
-Evaluator の未達記録は保持されます。
-全スプリント共通の製品正本は `docs/spec/`、過去スプリント固有の判断は `docs/sprints/`、実装ログは
-`docs/progress/` に分けます。
+## 設計の参考と出典
 
-スプリントIDは `sprint-005.md` のようにゼロ埋めします。`sprint-5.1.md` や `sprint-5.10.md` のような
-小数IDは作りません。合格済みスプリントへの軽微な追加調整は、ユーザーが明示しなくても
-`sprint-005-patch-001.md` のような Patch Sprint として切ります。同一の機能面・同一の利用フローに閉じ
-（画面を持たない製品では同一コマンド・同一機能領域）、自動回帰チェックが既にある軽微変更は
-`Type: micro` として軽量評価（機能完全性・動作安定性・回帰なしのみ採点）で回せます。
+今回の構成はユーザー承認による製品設計です。少ない常設context、条件付き読取、小変更での計画省略、
+実行可能な検証という考え方を参考にし、公式標準として扱っていません。
 
-## 設計原則（一次情報に基づく）
+https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra
+https://learn.chatgpt.com/docs/build-skills
+https://code.claude.com/docs/en/best-practices
 
-1. **What と How を分離** — Planner は「何を」に徹し、「どう作るか」は Generator に委ねる
-   （実装の誤指定は下流に伝播する）。
-2. **ファイルで受け渡す** — spec index / spec details / sprint contract → progress → feedback。
-   セッションをまたいでも状態が残り、過去スプリント判断が現在の正本を肥大化させない。
-3. **生成と評価を分離（GAN）** — 自己評価は甘くなる。独立した懐疑的な評価器がループを締める。
-4. **閾値で合否・苦手を重く** — 閾値の正本は `docs/spec/rubric.md`。プロジェクト種別に応じて
-   Planner が調整し、モデルが苦手なデザイン性・独自性を重く見る。
-5. **実際に動かして検証・証跡を残す** — コードを読むだけにせず、UIはブラウザ、非UIはコマンド/APIの入出力を
-   実行してから採点する。証跡（コマンド結果・実操作の記録・視覚評価時のスクリーンショット）の
-   無い合格は無効。同時に、rubric・契約に列挙した証拠形式を満たせば合格に十分（safe harbor）で、
-   Evaluator が契約に無い証拠形式を発明して合否条件にすることはできない。
-6. **作る前に合意 / 完了前に検証** — brainstorm-before-build と verification-before-completion。
-7. **回帰を資産化する** — 合格した受け入れ基準は Generator が自動チェックとして回帰スイートに
-   積み、Evaluator はスイート実行＋新規面の実操作確認に集中する。
-8. **検証を規模とリスクに比例させる** — 検証基盤の完成度自体は製品要件にしない。受け入れ基準・
-   証拠形式の厳格化はユーザー承認を経てから反映し、検証だけが膨らむループは finding の対象区分
-   （product / verification-infra）と dispatch 予算で検知して、修正 / 水準を下げて受理 /
-   Non-scope 化のユーザー選択へ返す。
+資料を使う質問の参考記事:
+https://note.com/taki4416/n/nbbd9fb2bea78
 
-## ブラウザ検証の方針
-
-UIの評価では、Evaluator は環境ごとのネイティブな検証面を優先します。CLI/API/pluginの非UI評価はコマンドや入出力で行います。
-
-1. **Codex App:** Browser Use / `@Browser`
-2. **Claude Code Desktop App:** Preview pane / autoVerify
-3. **Codex CLI / Claude Code CLI:** Playwright test / Playwright script。Playwright MCP は
-   ホスト側に既設の場合のみ使い、ハーネスからは常時起動しない
-4. **例外:** Computer Use や実 Chrome は、ログイン済みブラウザ状態や GUI 専用操作が必要なときだけ
-5. **Fallback:** build、HTTP 疎通、静的スクリーンショット、手動確認項目を feedback に残す
-
-標準経路に Chrome extension を必須化しません。自分のローカル利用では、Codex App は Browser Use、
-Claude Desktop は Preview、CLI は Playwright に寄せます。
-
-## CLAUDE.md / AGENTS.md と Hook の考え方
-
-このプラグインは install 時や Hook 実行時に `CLAUDE.md` / `AGENTS.md` を勝手に上書きしません。
-会話から Harness が起動した時、または `/harness` を明示実行した時だけ、no-overwrite で生成します。
-仕組みは次の通りです。
-
-1. **Claude Code:** `hooks/session-start.sh` は SessionStart（startup / clear / compact）で短い適用条件と
-   `skills/using-harness/SKILL.md` の場所だけを `hookSpecificOutput.additionalContext` として返します。
-   Skill全文は注入せず、該当依頼でだけ読みます。リポジトリの `CLAUDE.md` は変更しません。
-2. **Codex:** Codex は plugin から `AGENTS.md` を上書きしません。代わりに `.codex-plugin/plugin.json`
-   で `skills/` を配布し、Codex が skill の `name` / `description` を見て必要時に `SKILL.md` を読みます。
-3. **Harness 初期化:** 取り込み先に `CLAUDE.md` / `AGENTS.md` / Harness runtime設定が無ければ、`.harness/config.toml` などを `templates/` から生成します。
-   会話起動でも `/harness` 起動でも同じ処理です。既に独自内容がある場合は上書きせず、
-   `docs/harness-guidance.md` に追記候補だけを残します。既存Harness設定やAgent定義も変更しません。
-4. **なぜこの形か:** `CLAUDE.md` / `AGENTS.md` はプロジェクト固有の永続ルールです。ハーネスは
-   どのリポジトリにも差し込める開発ワークフローなので、永続ルールを上書きせず、skill と runtime
-   context として配る方が衝突しにくいです。
-
-## 前提
-
-- Claude Code CLI / Desktop App、Codex CLI / App。
-- CLI での UI 検証は Playwright を優先します。初回は `npx playwright install` でブラウザ取得が
-  必要な場合があります。
-- Claude Code の SessionStart フックは bash スクリプト（macOS / Linux）。Codex ではこの
-  additionalContext 注入は使わず、skill として利用します。
-
-## クレジット / 一次情報
-
-このプラグインは以下の一次情報と参考実装に基づいています。
-
-- [Harness design for long-running application development — Anthropic](https://www.anthropic.com/engineering/harness-design-long-running-apps)
-- [Effective harnesses for long-running agents — Anthropic](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
-- [Building agents with the Claude Agent SDK — Anthropic](https://www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk)
-- 方法論の参考: [obra/superpowers](https://github.com/obra/superpowers)
+記事のgrill-with-docsと同梱mattpocock/skills grillingは別実装です。Harnessはローカルの資料活用・停止条件を追加し、
+元のgrilling本文とMIT Licenseを保持しています。詳細は [grilling](plugins/harness/skills/grilling/SKILL.md)。
+過去の設計と他の参考資料は [KNOWLEDGE](docs/KNOWLEDGE.md) から必要なときだけ確認できます。
 
 ## ライセンス
 
-MIT
-
-## 指示の正本と更新
-
-通常進行は `plugins/harness/skills/harness-loop/SKILL.md`、runtime・移行・特殊失敗・評価の詳細は
-その条件付きreferencesを正本とします。既存検証の局所修理は期待結果と証拠要件を変えず同Sprint1回まで、
-意味不変の誤記訂正は既存承認で進めます。microは低リスクと独立検証可能性で判断し、証跡再利用は
-候補と関係する依存物の同一性を確かめます。無関係なdirtyを片付ける必要はありません。
-
-checkoutの変更は導入済みcacheや既存プロジェクトのguidanceを自動更新しません。Yasashiiへの反映は
-下流の同期手順を使います。v0.5.5の変更・互換性・更新案内は `docs/releases/v0.5.5.md` を参照してください。
-初期化のno-overwriteは維持します。明示承認済みのguidance保守は、固有規則と既存変更を保持して
-必要差分だけ反映できます。plugin更新だけでruntime/model設定やAgent定義を変更することはありません。
+MIT。詳細は [LICENSE](LICENSE)。

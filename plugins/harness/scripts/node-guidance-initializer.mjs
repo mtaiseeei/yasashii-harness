@@ -8,54 +8,59 @@ const defaultPluginRoot = path.resolve(scriptDir, "..");
 
 export const ignoreRules = ["config.local.toml", "config.local.json"];
 
-const seedFiles = new Map([
+export const seedFiles = new Map([
   ["docs/spec.md", `# Spec Index
 
-<!-- Planner が短い正本インデックスとして書く。詳細本文は docs/spec/*.md へ -->
+<!-- Reuse existing specifications. Link only the relevant domain documents; create detail when needed. -->
 `],
-  ["docs/spec/product.md", `# Product
+  ["docs/sprints/state.md", `# Current State
 
-<!-- Planner が書く: 目的、対象ユーザー、ゴール/非ゴール、成功状態 -->
-`],
-  ["docs/spec/features.md", `# Features
+<!-- Update current state; retain prior detail in history. Do not duplicate this source in NEXT_SESSION or PROJECT. -->
 
-<!-- Planner が書く: 機能IDとユーザーから見た振る舞い -->
-`],
-  ["docs/spec/constraints.md", `# Constraints
-
-<!-- Planner が書く: 横断制約、禁止事項、安全方針、絶対に回帰させない条件 -->
-`],
-  ["docs/spec/domain.md", `# Domain
-
-<!-- Planner が書く: 業務ルール、概念データ、KPI/計算方針 -->
-`],
-  ["docs/spec/ui.md", `# UI / UX
-
-<!-- Planner が書く: 体験方針と非機能要件 -->
-`],
-  ["docs/spec/rubric.md", `# Evaluation Rubric
-
-<!-- Planner が書く: プロジェクト種別、基準ごとの閾値、スコアのアンカー例 -->
-`],
-  ["docs/sprints/state.md", `# Sprint State
-
-<!-- オーケストレーターだけが書く進行状態の正本 -->
-
-- Current ID: TBD
-- Retry Count: 0
-- Spec-Issue Count: 0
-- Lineage Dispatches: 0
-- Model Tier: standard
-- Rotate: none
-- Next Planned: TBD
-
-## スプリント一覧
-| ID | Status | Contract | Progress | Feedback |
-|----|--------|----------|----------|----------|
-
-## Deferred / Superseded
+- Purpose: TBD
+- Current work: none
+- Unresolved: none recorded
+- Next action: identify the requested change and relevant specification
+- Authorization / constraints: inherit the user's request and project rules
+- Specification: resolve existing canonical specifications before adding documents
+- Implemented: none recorded
+- Verified: none recorded (record target revision and evidence)
+- Deployed: none recorded
 `],
 ]);
+
+export function guidanceSources(root, options = {}) {
+  const result = {};
+  // Bounded discovery: conventional names and links in root guidance, never all
+  // Sprint history. Explicit paths support a project's other existing layouts.
+  const links = [];
+  for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+    const stat = lstat(path.join(root, name));
+    if (stat?.isFile() && !stat.isSymbolicLink()) {
+      const content = fs.readFileSync(path.join(root, name), "utf8");
+      for (const match of content.matchAll(/\[[^\]]*\]\(([^\s)#]+)(?:#[^)]*)?\)/gu)) links.push(match[1]);
+    }
+  }
+  for (const [kind, names, defaultPath] of [
+    ["spec", ["docs/spec.md", "SPEC.md", "spec.md", "docs/SPEC.md", "docs/requirements.md", "docs/PRD.md", "PROJECT.md"], "docs/spec.md"],
+    ["state", ["docs/sprints/state.md", "state.md", "STATE.md", "docs/state.md", "NEXT_SESSION.md"], "docs/sprints/state.md"],
+  ]) {
+    const explicit = options[`${kind}Path`];
+    const candidates = explicit ? [explicit] : [...new Set([...names, ...links.filter((value) => kind === "state" ? /(?:state|next.session)\.md$/iu.test(value) : /(?:spec|requirements|prd|project)[^/]*\.md$/iu.test(value))])];
+    const existing = [];
+    for (const relative of candidates) {
+      if (typeof relative !== "string" || path.isAbsolute(relative) || relative.includes("\\") || relative.split("/").some((part) => !part || part === "." || part === "..") || !relative.endsWith(".md")) {
+        if (explicit) throw new Error(`unsafe ${kind} path: ${relative}`);
+        continue;
+      }
+      const stat = lstat(path.join(root, relative));
+      if (stat) existing.push(relative); // preflight checks every component/type
+    }
+    if (explicit && existing.length !== 1) throw new Error(`--${kind}-path must name an existing Markdown file`);
+    result[kind] = existing.length ? existing : [defaultPath];
+  }
+  return result;
+}
 
 function lstat(target) {
   try {
@@ -75,10 +80,10 @@ function sameFile(left, right) {
 }
 
 export function initializerKindForPlatform(platform = process.platform) {
-  return platform === "win32" ? "node" : "bash";
+  return "node"; // A single portable writer keeps initialization behavior aligned.
 }
 
-export function runNodeGuidanceInitializer(targetRoot, { pluginRoot = defaultPluginRoot } = {}) {
+export function runNodeGuidanceInitializer(targetRoot, { pluginRoot = defaultPluginRoot, specPath, statePath } = {}) {
   let stdout = "";
   let stderr = "";
   let changedAny = false;
@@ -125,7 +130,7 @@ export function runNodeGuidanceInitializer(targetRoot, { pluginRoot = defaultPlu
   };
 
   // harness.mjs performs the complete all-destination safety preflight before
-  // calling this writer. Keep the write sequence aligned with init-guidance.sh.
+  // calling this shared writer; init-guidance.sh delegates to that same CLI.
   ensureDir(harnessDir);
 
   if (!lstat(ignoreFile)) {
@@ -174,12 +179,15 @@ export function runNodeGuidanceInitializer(targetRoot, { pluginRoot = defaultPlu
     warn("warning: ignore rule installed but git verification skipped (target is not a git worktree)");
   }
 
-  for (const relative of ["docs/spec", "docs/sprints", "docs/progress", "docs/feedback"]) {
-    ensureDir(path.join(targetRoot, relative));
+  const sources = guidanceSources(targetRoot, { specPath, statePath });
+  for (const [kind, relatives] of Object.entries(sources)) {
+    out(`canonical ${kind}: ${relatives.join(", ")}${relatives.length > 1 ? " (resolve existing candidates; no competing source created)" : ""}`);
+    for (const relative of relatives) {
+      ensureDir(path.dirname(path.join(targetRoot, relative)));
+      if (!lstat(path.join(targetRoot, relative))) seedFile(path.join(targetRoot, relative), seedFiles.get(relative));
+    }
   }
-  for (const [relative, content] of seedFiles) {
-    seedFile(path.join(targetRoot, relative), content);
-  }
+  ensureDir(path.join(targetRoot, "docs"));
 
   const hadCustomGuidanceTarget = ["CLAUDE.md", "AGENTS.md"].some((relative) => {
     const target = path.join(targetRoot, relative);

@@ -26,7 +26,7 @@ escape_for_json() {
 }
 
 # Short applicability pointer only; the Skill is loaded conditionally by the main agent.
-session_context="Agentic Harness is available for starting or continuing substantial, multi-sprint development. To build a product, implement a substantial feature, or continue a Harness-managed repository, load harness:using-harness at ${PLUGIN_ROOT}/skills/using-harness/SKILL.md and follow its routing. Do not start the loop for ordinary questions or init/check-only requests. Role subagents continue their assigned task."
+session_context="Agentic Harness preserves goals, decisions and current state. Small reversible changes can be implemented and verified directly. For normal features or substantial development, load harness:using-harness at ${PLUGIN_ROOT}/skills/using-harness/SKILL.md for proportional planning and independent completion review. Read only relevant current specs; do not load all history. Questions and init/check/upgrade-only requests do not start development. Role subagents continue their assigned task."
 content_escaped=$(escape_for_json "$session_context")
 
 # Claude Code reads hookSpecificOutput.additionalContext (nested).

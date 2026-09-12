@@ -31,14 +31,14 @@ function parseArgs(argv) {
   return { help: false, repoRoot };
 }
 
-// Rules are checked once at their canonical owner, never copied into every adapter.
+// Validate references to executable runtime fields at their canonical owner.
+// Prose assertions about review, repair, approval and interview behavior belong
+// to independent scenario evaluation, not exact wording requirements.
 const REQUIRED = [
-  ["plugins/harness/skills/harness-loop/SKILL.md", ["オーケストレーターのみ", "Lineage Dispatches", "limits.max_lineage_dispatches", "limits.max_spec_issue_returns", "done-by-user-decision"]],
-  ["plugins/harness/skills/harness-loop/references/scope.md", ["期待結果・合否条件・証拠要件を変えず", "独立再評価", "同一Sprintで1回", "意味不変", "Spec-Issue Count", "Lineage Dispatches", "2 回連続"]],
-  ["plugins/harness/skills/harness-loop/references/evaluation.md", ["safe harbor", "無関係なdirty", "関連変更", "依存物", "証跡の無い合格", "CLI・API・plugin"]],
-  ["plugins/harness/skills/harness-loop/references/runtime.md", ["native direct dispatch", "built-in/default Agent", "Unknown model", "unknown field", "host metadata", "resume: true"]],
-  ["plugins/harness/skills/harness-loop/references/state.md", ["runtime-migration", "unknown", "no-overwrite", "deferred", "superseded"]],
-  ["plugins/harness/agents/planner.md", ["Grilling gate", "検証基盤の実装仕様を書かない", "未決", "safe harbor"]],
+  ["plugins/harness/skills/harness-loop/SKILL.md", ["Lineage Dispatches", "limits.max_lineage_dispatches", "limits.max_spec_issue_returns", "done-by-user-decision"]],
+  ["plugins/harness/skills/harness-loop/references/scope.md", ["Retry Count", "Spec-Issue Count", "Lineage Dispatches", "verification-scope-issue"]],
+  ["plugins/harness/skills/harness-loop/references/runtime.md", ["scripts/resolve-runtime-config.mjs", "applicationPaths.roleModel", "applicationPaths.roleEffort", "dispatch-attempt", "launch-verified", "Unknown model", "unknown field", "resume: true"]],
+  ["plugins/harness/skills/harness-loop/references/state.md", ["Model Tier", "Rotate", "deferred", "superseded"]],
 ];
 const FORBIDDEN = [
   ["plugins/harness/skills/harness-loop/SKILL.md", ["harness_luna_worker", "provision-codex-agent.mjs"]],
@@ -60,7 +60,7 @@ function validateReachability(repoRoot) {
     }
   }
   visit(resolve(plugin, "skills/using-harness/SKILL.md"));
-  for (const file of ["scope.md", "evaluation.md", "runtime.md", "state.md", "planner-templates.md"]) {
+  for (const file of ["scope.md", "evaluation.md", "runtime.md", "state.md", "planner-templates.md", "migration.md"]) {
     assert.ok(visited.has(resolve(plugin, "skills/harness-loop/references", file)), `unreachable reference: ${file}`);
   }
   for (const file of ["templates/AGENTS.md", "templates/CLAUDE.md", "templates/docs/harness-guidance.md"]) {
@@ -95,10 +95,13 @@ function validateHook(repoRoot) {
 function validateGrillingPackage(repoRoot) {
   const pluginRoot = resolve(repoRoot, "plugins/harness");
   const skillPath = resolve(pluginRoot, "skills/grilling/SKILL.md");
-  const skill = readFileSync(skillPath, "utf8").replace(/\r\n/g, "\n");
-  const body = skill.match(/<!-- upstream-body:start -->\n([\s\S]*?)<!-- upstream-body:end -->/);
+  const upstreamPath = resolve(pluginRoot, "skills/grilling/references/upstream.md");
+  const upstream = readFileSync(upstreamPath, "utf8").replace(/\r\n/g, "\n");
+  // The original upstream body may retain its provenance wrapper on relocation.
+  const body = upstream.match(/<!-- upstream-body:start -->\n([\s\S]*?)<!-- upstream-body:end -->/);
+  const upstreamBody = body ? body[1] : upstream;
   const digest = (value) => createHash("sha256").update(value.toString().replace(/\r\n/g, "\n")).digest("hex");
-  if (!body || digest(body[1]) !== "e3ff41d7514da8ddec35e322176761a68055c4bf074f489a0e6e392a40bfd8ba") {
+  if (digest(upstreamBody) !== "e3ff41d7514da8ddec35e322176761a68055c4bf074f489a0e6e392a40bfd8ba") {
     throw new Error("grilling: upstream interview body differs from pinned revision 3cca18b368ae95cdbdebbff572ccafa662551015");
   }
   if (digest(readFileSync(resolve(pluginRoot, "skills/grilling/LICENSE"))) !== "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5") {
@@ -113,7 +116,7 @@ function validateGrillingPackage(repoRoot) {
     const source = readFileSync(file, "utf8").replace(/```[\s\S]*?```/g, "");
     for (const [, target] of source.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
       if (target.startsWith("https:")) continue;
-      if (!target.includes("grilling/SKILL.md") && !target.includes("agents/planner.md") && target !== "LICENSE") continue;
+      if (!target.includes("grilling/SKILL.md") && !target.includes("agents/planner.md") && target !== "LICENSE" && target !== "references/upstream.md") continue;
       readFileSync(resolve(dirname(file), target.split("#")[0]));
     }
   }
@@ -134,7 +137,7 @@ function validateLoopRules(repoRoot) {
     }
     for (const needle of needles) {
       if (!source.includes(needle)) {
-        throw new Error(`${relativePath}: missing required loop-rule vocabulary ${JSON.stringify(needle)}`);
+        throw new Error(`${relativePath}: missing documented runtime field ${JSON.stringify(needle)}`);
       }
     }
     completed.push(relativePath);

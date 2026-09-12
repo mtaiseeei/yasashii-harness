@@ -1,37 +1,42 @@
 ---
 name: using-harness
-description: 新しいアプリ・まとまった機能開発、Harness管理repoの次Sprint・Patch、Harnessの初期化・導入確認の入口。監査や質問だけでは開発を開始しない。
+description: 開発の規模と影響に応じて直接修正・短い計画とレビュー・Sprint設計へ進める。Harnessの初期化・確認・既存repo文書移行にも使う。
 ---
-
-<SUBAGENT-STOP>
-特定roleのためdispatchされたsubagentはこの入口を繰り返さず、自分の担当作業に集中する。
-</SUBAGENT-STOP>
 
 # Harness を使う
 
-短い指示から大きな開発を継続する入口。現在の依頼と既存承認を優先する。
+目的・既決事項・現在地を引き継ぎ、依頼に必要な設計と検証で完成まで進める。
+特定roleとしてdispatchされたsubagentは入口を繰り返さず担当に集中する。
 
-## 管理コマンド
+## 開発依頼
 
-- `$using-harness init` / 「Harnessを初期化して」: plugin rootの `scripts/harness.mjs init --root <repo>` をNode.jsで実行する。
-- `$using-harness check` / 「Harnessの導入状態を確認して」: 同じCLIの `check --root <repo>`。完全read-only。
-- Harness CLIによる既存repo guidanceの`upgrade`: 未実装と報告し、既存ファイルを変更せず最新版とも判定しない。
-  plugin自体の更新はhostのmarketplace/plugin管理で行う別操作であり、この未実装の対象ではない。
+まず現在の依頼と既存承認を確認し、必要なら既存の現在状態と該当仕様・コードだけを読む。
+影響範囲、可逆性、外部契約、データ、権限、失敗時影響で扱いを判断する。
+行数・画面数・自動テストの有無だけで硬い足切りをしない。管理repoでも同じ判断を使う。
 
-init/checkだけなら結果を報告し、PlannerやSprintを開始せず、`harness-loop`へ進まない。
-対象repoにpackage.json/lockfile/node_modulesを作らず、package installを要求しない。
-plugin rootはこのSkillの2階層上。init/checkでは既存guidance・設定・Agent定義は上書きしない。
+- **小変更**: 小さな挙動変更も担当Agentが直接修正し、影響に必要な確認を行って完了する。
+  計画、独立レビュー、micro契約、3役、3文書、runtime resolverの実行は必須ではない。
+  変更・確認結果を短く報告し、継続に必要な現在状態や該当仕様が変わればその正本を更新する。
+- **通常の機能追加**: 必要な短い計画を既存の作業文書等に置き、実装と必要検証の後に独立レビュー。
+  [通常進行](../harness-loop/SKILL.md)を使う。未決事項がなければPlannerや開始確認を増やさない。
+- **高リスク変更**: 移行、権限、本番重要操作等は実行前に対象・影響・復旧方法と承認範囲を確認する。
+  未承認の副作用だけを利用者へ確認し、実行後検証と独立レビューを維持する。
+- **大きく曖昧な開発**: 必要な領域仕様で設計し、意味のある単位のSprintへ分ける。
+  [通常進行](../harness-loop/SKILL.md)のPlanner判断へ。質問は利用者に必要な決定が残るときだけ。
 
-## 開発する依頼
+分類に迷うときだけ[変更分類](../harness-loop/references/scope.md)の例を確認する。
+承認済みの可逆な実装判断・修理は進め、重要な製品判断や未承認の副作用を推測しない。
+監査・質問だけの依頼は実装を開始しない。
 
-「アプリを作って」「まとまった機能を実装」「次のSprintを進めて」「続きから」なら
-[ループ](../harness-loop/SKILL.md)へ進む。`/harness`の追加入力は要求しない。
-承認済みの監査で必要修正まで依頼された場合も、範囲を引き継いで進める。
+## 管理操作
 
-- 非管理下のリポジトリ（stateとspecが両方ない）ではtypo、1行変更、設定変更など単発の非機能修正は直接扱える。
-- Harness管理下は[変更分類](../harness-loop/references/scope.md)で直接修正 / micro / 通常Patchを選ぶ。
-  microは同一の機能面・同一フローに閉じ、低リスクで独立検証できる場合。既存自動チェックだけを資格にしない。
+plugin root（このSkillの2階層上）の `scripts/harness.mjs` をNode.jsで使う。
 
-どう動くか（3 role）: Plannerが仕様・契約、Generatorが実装・progress、Evaluatorが独立評価・feedbackを書く。
-stateはオーケストレーターだけが書く。ホストが複数Agentを扱える場合はdispatchし、不可ならroleごとの独立作業単位へfallbackする。
-初回の不足分生成・runtime・移行・失敗時の詳細はループが条件に応じて案内する。
+- `init --root <repo>`: 不足分だけno-overwrite生成。既存の仕様・状態の正本を利用する。
+- `check --root <repo>`: 読み取り専用の導入確認。最新版との判定ではない。
+- `upgrade --root <repo>`: 既存repo文書の保守移行preview。適用方法は必要時だけ
+  [文書移行](../harness-loop/references/migration.md)を読む。
+
+管理操作だけなら結果を報告して終了し、PlannerやSprintを開始しない。
+pluginの更新とrepo文書の移行は別操作。installed cacheや消費repoを自動で変更しない。
+対象repoへpackage.json/lockfile/node_modulesを作らず、依存installを要求しない。

@@ -1,84 +1,62 @@
 ---
 name: harness-loop
-description: Harness管理下で承認された開発をPlanner・Generator・独立EvaluatorとSprint正本で継続する。初期化・導入確認だけならusing-harnessへ。
+description: 通常機能の短い計画と完成時独立レビュー、大きな開発のSprint進行を支える。小変更はusing-harnessで直接完了できる。
 ---
 
 # Harness の通常進行
 
-あなたはオーケストレーター。ホストが対応する場合はroleをdispatchし、対応しない場合は
-roleごとの独立作業単位で進める。GeneratorとEvaluatorを分離し、自己評価を合否の根拠にしない。
-現在の明示依頼・既決事項・既存承認を引き継ぎ、承認済みの範囲は開始確認を重ねず完了まで進める。
+現在の目的・既決事項・承認範囲を引き継ぎ、実装・必要検証・独立レビューまで進める。
+小変更なら[入口](../using-harness/SKILL.md)の直接修正で足りる。全変更へ3役やSprint文書群を強制しない。
 
-## 正本と書き手
+## 再開と正本
 
-| 正本 | 唯一の書き手 |
-|---|---|
-| `docs/spec.md`（短い索引）、必要な `docs/spec/*.md`（rubric含む）、`docs/sprints/sprint-*.md`（契約） | Planner |
-| `docs/progress/sprint-*.md`（実装と引き渡し） | Generator |
-| `docs/feedback/sprint-*.md`（独立評価と証跡） | Evaluator |
-| `docs/sprints/state.md`（Current ID、Status、各counter、Model Tier、Rotate） | オーケストレーターのみ |
+既存の現在状態 → 該当領域の仕様・コード → 矛盾や理由が必要な場合だけ関連履歴、の順に読む。
+全Sprint照合・全履歴読取を開始条件にせず、参照先を一括読込しない。
+既存repoの仕様や作業文書を使い、CONTEXT.mdや定型文書群を無条件で追加しない。
+仕様変更時は該当仕様と決定理由を整合更新し、置換した判断を識別する。
 
-Statusはstateにだけ持つ。順序はCurrent IDとNext Plannedに従う。合否を記録してから次へ進む。
-IDは `sprint-NNN` / `sprint-NNN-patch-PPP`。延期/置換には理由を記録し、黙って飛ばさない。
-各roleは自分以外の正本を直さず、自分の引き渡しから担当へ連絡する。
+- 現在状態（既定 `docs/sprints/state.md`）はオーケストレーターのみ更新する。
+  目的、進行中作業、未解決事項、次の一手、承認・制約、必要仕様、対象版と証跡への参照を持つ。
+  実装済み・検証済み・配備済みを分ける。現在内容を更新し、過去詳細は履歴へ保持する。
+  state/NEXT_SESSION/PROJECTに現在状態の正本を重複させない。
+- 通常機能の計画と引き渡しは短くてよい。既存のissueや作業文書へ集約でき、3文書は不要。
+- 大きな開発でSprintを使う場合は、Plannerが仕様・rubric・契約、Generatorが実装・progress、
+  独立Evaluatorがfeedbackを担当する。所有を越境せず必要な担当へ変更を渡す。
+  書式や旧state整理が必要なときだけ[state](references/state.md)を読む。
 
-## 開始・再開
+## 計画・実装
 
-- `init` / `check`だけなら[入口](../using-harness/SKILL.md)へ戻り、結果を報告して停止する。
-- 初回はpluginの `scripts/harness.mjs init --root <repo>` で不足分だけno-overwrite生成する。
-  初期化では既存guidance、設定、Agent定義を上書きしない。明示承認済みのguidance保守は、
-  固有規則とdirtyを保持して必要差分を反映できる。設定・model・Agent定義の変更権限は増やさない。
-  初期化や旧state移行が必要なときだけ[state](references/state.md)を読む。
-- stateのCurrent ID、対象契約、関連仕様と直前feedbackを確認する。再開はファイルの更新と
-  現在の差分を確認し、未読・変更済み・矛盾する箇所だけ読み直す。情報が欠けるfresh作業単位は必要正本を読む。
-  全履歴の照合、無関係な仕様・旧ログの全文読込、全回帰の反復は通常再開の条件にしない。
-- 追加依頼は[変更分類](references/scope.md)で直接修正 / micro / 通常Patchに分ける。
-  ドキュメントでも製品としての指示挙動が変わるなら直接修正とは扱わない。
-- 最初のPlannerを含む全roleのdispatch前にruntime resolverを使い、実効model/effort・lifecycleを確認する。
-  初回、host/config変更、tier変更、launch拒否、resume可否が不明なときは[runtime](references/runtime.md)の該当節を読む。
-  既定はhost継承。明示値を推測変換せず、起動metadataなしにlaunch-verifiedを主張しない。
+必要な短い計画には目的・変更範囲・確認方法を示す。既存依頼で明確ならそれを利用する。
+未決の重要判断や大きな設計があるときだけ[Planner](../../agents/planner.md)を使う。
+既決事項や委任済み実装詳細を聞き直さず、承認済みの開始に再承認を要求しない。
+高リスク操作は実行前に対象・影響・復旧方法・既存承認を確認し、未承認部分だけ利用者へ問う。
 
-## 1. Planner
+実装担当は[Generator](../../agents/generator.md)として意味のあるまとまりを実装し、必要検証する。
+承認された可逆な実装判断・修理は自律的に進め、無関係な追加を合格条件にしない。
+小変更に再分類して進行中の機能追加全体の独立レビューを省略してはならない。
 
-対象契約が未確定・要改訂のときだけ[Planner](../../agents/planner.md)へ依頼と既決事項を渡す。
-Grilling gateの必要性判断を使い、未決の重要な製品判断はユーザーへ確認する。
-既存承認と明示委任を尊重し、明確な承認済み依頼で新しい開始承認を作らない。
-PlannerはWhatを定義し、HowはGeneratorへ委ねる。契約・rubricの実質変更には
-[厳格化ゲート](references/scope.md)を適用する。意味不変の訂正は担当が根拠を記録して行える。
+roleをdispatchするときだけ、最初のPlannerを含めresolverで実効model/effortとlifecycleを確認する。
+既定はhost継承。初回、host/config/tier変更、launch拒否、resume不明時だけ[runtime](references/runtime.md)。
+Generatorのtier変更はfresh。同tierのresumeもmodel/effort保持の実証が必要。
+Codexはnative built-in/default Agentを使う。subagent不可なら独立作業単位へ分け、実装者の自己評価を
+独立レビューと呼ばない。独立確認不能なら未確認として報告し、必要なら利用者の受理判断へ渡す。
 
-## 2. Generator
+## 完成時の独立レビュー
 
-Generatorは高リスク・2回目のimplementation不合格・証拠付き推薦でstrong、tier変更はfresh。
-同tierのresumeもmodel/effort保持の実証が必要。状態更新はdispatchより先に行う。
+[Evaluator](../../agents/evaluator.md)へ対象の計画・仕様・差分・実行方法を渡す。
+UIは実操作、非UIはコマンド/API/入出力で確認し、対象版と結果を短く残す。
+評価基準・証拠の十分性・証跡再利用は必要時に[評価](references/evaluation.md)を読む。
+修正後は変更箇所と影響範囲を中心に再評価し、新しい懸念がなければ全検査を反復しない。
+合格を記録してから次の作業へ進む。独立評価を要する作業の未達を利用者が明示受理した場合だけ
+`done-by-user-decision` として未達と残余リスクへの参照を保持する。小変更は担当の必要検証で完了できる。
 
-[Generator](../../agents/generator.md)へ対象Sprintと必要正本を渡し、1回で1Sprintを実装させる。
-起動/確認方法、変更と関連依存、実行結果、残課題がprogressにあれば `awaiting-eval` にする。
-既存dirtyを保護する。commit・stage・pushはこのSkillから許可を追加しない。
+## Sprintの失敗と上限（Sprintを使う場合だけ）
 
-## 3. 独立Evaluator
-
-[Evaluator](../../agents/evaluator.md)へ契約・rubric・引き渡しを渡し、実物を動かして評価させる。
-UIは利用可能なブラウザ、非UIはコマンド/API/入出力で確認する。Evaluatorは実装を直さない。
-評価基準・証拠の十分性・再評価の増分原則は[評価](references/evaluation.md)。
-契約/rubricの証拠で十分（safe harbor）とし、列挙外の新規検証基盤を合否条件にしない。
-各findingは `product` / `verification-infra` に分ける。不明ならproduct。
-無関係なdirtyだけで既存証跡を失効させず、候補と関係する依存物の実差分を確認する。
-
-## 4. 記録して継続
-
-- 合格の証跡を確認して `done` にし、Retry CountとSpec-Issue Countを0に戻して次へ進む。
-  次dispatchがあれば最後のModel Tierをresolverへ引き継ぐ。全完了時だけstandard/noneへ戻す。
-- implementation-issueはRetry Countを増やしGeneratorへ。3回連続不合格なら追加dispatchを止めユーザーへ返す。
-- spec-issue、verification-scope-issue、基準変更、検証のみdiffは[特殊失敗と検証スコープガード](references/scope.md)へ。
-  既存検証の限定修理は期待結果・基準・証拠要件不変かつ同Sprint1回まで。修理後は独立再評価する。
-- ユーザーが未達と残余リスクを明示して受理したときだけ `done-by-user-decision`。
-  Evaluatorの未達記録を残す。証跡なしの通常合格は無効。
-
-## dispatchの上限
-
-Generator/Evaluatorの実dispatch前にLineage Dispatchesを確認し、`limits.max_lineage_dispatches`
-（既定10）未満なら+1を記録する。上限ならdispatchせず、修正/低い証拠水準で受理/Non-scope化を示す。
-同じBase Sprintのpatch、spec-issue、fresh化では予算をリセットしない。
-次メインSprintまたはユーザーの明示resetだけで0に戻す。子作成前launch拒否は予約をfallbackに引き継ぎ、
-子を作らず最終中断したときだけ取消す。Spec-Issue Countは `limits.max_spec_issue_returns`（既定2）で停止する。
-詳細な状態形式・移行・特殊遷移は必要時だけ参照し、参照先をすべて毎回読むことを前提にしない。
+Current ID、Status、Retry Count、Spec-Issue Count、Lineage Dispatches、Model Tier、Rotateを現在状態に保持。
+Generator/Evaluator dispatch前に `limits.max_lineage_dispatches`（既定10）を確認し、未満なら+1を先に記録する。
+同じBase Sprintのpatchやfresh化で累積をリセットしない。子作成前launch拒否は予約をfallbackに引き継ぐ。
+implementation不合格はRetry Count+1、3回連続で追加dispatchを止め判断を返す。
+仕様の実質変更、検証のみdiff、限定修理、`limits.max_spec_issue_returns`（既定2）など特殊時だけ
+[変更・失敗](references/scope.md)を読む。通常機能にこの管理項目群を新設する必要はない。
+合格時はRetry/Spec-Issueを0にし、次dispatchがあるなら最後のtierをresolverへ引き継ぐ。
+全完了時だけstandard/noneへ戻す。commit・push・公開の権限はセッションの承認に従う。

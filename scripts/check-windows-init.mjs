@@ -73,10 +73,10 @@ try {
     assert.throws(() => toGitBashPath("\\\\?\\GLOBALROOT\\danger", "win32"), /device path/);
   });
 
-  check("Windows selects the Node-native writer while POSIX keeps Bash", () => {
+  check("All hosts select the same Node-native writer", () => {
     assert.equal(initializerKindForPlatform("win32"), "node");
-    assert.equal(initializerKindForPlatform("darwin"), "bash");
-    assert.equal(initializerKindForPlatform("linux"), "bash");
+    assert.equal(initializerKindForPlatform("darwin"), "node");
+    assert.equal(initializerKindForPlatform("linux"), "node");
   });
 
   check("Node-native initializer preserves the Bash initialization contract", () => {

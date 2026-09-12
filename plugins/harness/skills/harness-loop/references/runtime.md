@@ -2,6 +2,16 @@
 
 初回dispatchとhost/config変更時に読む。確認済みで変更がなければ保持した解決手順を使う。
 
+## 通常機能での利用
+
+roleのdispatchを行うときだけresolverを使う。小変更の直接修正では不要。
+Sprintを使わない通常機能は、このためにstateのcounter群や3文書を新設しない。
+実効model/effortと直前のtierは既存作業記録・host metadataから引き継ぎ、tier不明ならunknownを入力する。
+初回はinitialで解決し、選ばれた値とlaunch確認状況を短い引き渡しに残す。
+以下のstate.md項目・Current ID・counter・Sprint遷移の手順はSprintを使う場合に限る。
+モデル適用、継承、launch rejection、fresh/resumeの意味と安全境界は通常機能でも同じ。
+
+
 ### 0.5 Agent runtime設定を解決する
 
 各roleをdispatchする前に、pluginの `scripts/resolve-runtime-config.mjs` で実効設定を確認する。

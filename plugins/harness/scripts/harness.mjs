@@ -2,41 +2,21 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { toGitBashPath } from "./git-bash-path.mjs";
 import {
+  guidanceSources,
   ignoreRules,
-  initializerKindForPlatform,
   runNodeGuidanceInitializer,
 } from "./node-guidance-initializer.mjs";
+import { runGuidanceMigration } from "./guidance-migration.mjs";
 import { permissionBitsAllow } from "./platform-permissions.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pluginRoot = path.resolve(scriptDir, "..");
-const initializer = path.join(scriptDir, "init-guidance.sh");
 const templatesRoot = path.join(pluginRoot, "templates");
 
-const directoryTargets = [
-  ".harness",
-  "docs",
-  "docs/spec",
-  "docs/sprints",
-  "docs/progress",
-  "docs/feedback",
-];
-
-const alwaysFileTargets = [
-  ".harness/.gitignore",
-  "docs/spec.md",
-  "docs/spec/product.md",
-  "docs/spec/features.md",
-  "docs/spec/constraints.md",
-  "docs/spec/domain.md",
-  "docs/spec/ui.md",
-  "docs/spec/rubric.md",
-  "docs/sprints/state.md",
-];
+const directoryTargets = [".harness", "docs"];
+const alwaysFileTargets = [".harness/.gitignore"];
 
 const possibleFileTargets = [
   ".harness/config.toml",
@@ -44,14 +24,17 @@ const possibleFileTargets = [
 ];
 
 function usage() {
-  return `Usage: node harness.mjs <init|check> [--root PATH]
+  return `Usage: node harness.mjs <init|check|upgrade> [--root PATH]
 
-Commands:
-  init   Safely create missing Harness guidance without overwriting existing files.
-  check  Read-only report of Harness initialization readiness.
-
-Harness upgrade is not implemented. init and check never determine whether installed
-files are the latest version.`;
+  init/check [--spec-path EXISTING.md] [--state-path EXISTING.md]
+    Create missing minimal guidance / inspect read-only. Existing files are preserved.
+  upgrade --plan REVIEWED.json [--apply]
+    Preview an explicit maintenance plan without writing; --apply preserves originals
+    in .harness/migrations and refuses stale sources or unsafe document paths.
+    Plan schema: {version:1, files:[{path,beforeSha256,content,preserve:[],retire:[]}]}.
+    preserve lists exact custom rules, active approvals and unresolved text to retain;
+    retire lists exact superseded rules to remove. Author candidates from existing
+    specifications; the CLI does not summarize or decide semantic equivalence.`;
 }
 
 function parseArgs(argv) {
@@ -63,6 +46,7 @@ function parseArgs(argv) {
   const command = argv[0];
   let root = process.cwd();
   let rootSeen = false;
+  const options = {};
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--root") {
@@ -74,9 +58,18 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (["--plan", "--spec-path", "--state-path"].includes(argument)) {
+      const key = {"--plan": "plan", "--spec-path": "specPath", "--state-path": "statePath"}[argument];
+      if (options[key] || !argv[index + 1] || argv[index + 1].startsWith("--")) throw new Error(`${argument} requires one value`);
+      options[key] = argv[++index];
+      continue;
+    }
+    if (argument === "--apply" && !options.apply) { options.apply = true; continue; }
     throw new Error(`unknown argument: ${argument}`);
   }
-  return { command, root: path.resolve(root), help: false };
+  if (command === "upgrade" && (options.specPath || options.statePath)) throw new Error("upgrade does not accept source selection flags");
+  if (command !== "upgrade" && (options.plan || options.apply)) throw new Error("--plan/--apply are only for upgrade");
+  return { command, root: path.resolve(root), help: false, ...options };
 }
 
 function lstat(target) {
@@ -141,7 +134,7 @@ function canAccess(target, mode) {
   }
 }
 
-function inspect(root, { includePermissions = false } = {}) {
+function inspect(root, { includePermissions = false, specPath, statePath } = {}) {
   const entries = [];
   const unsafe = [];
   const gaps = [];
@@ -202,7 +195,16 @@ function inspect(root, { includePermissions = false } = {}) {
     }
   };
 
-  for (const relative of directoryTargets) inspectDirectory(relative);
+  const sources = guidanceSources(root, { specPath, statePath });
+  const sourceFiles = [...new Set([...sources.spec, ...sources.state])];
+  const sourceDirs = new Set(directoryTargets);
+  for (const relative of sourceFiles) {
+    let parent = path.dirname(relative);
+    while (parent !== ".") { sourceDirs.add(parent); parent = path.dirname(parent); }
+  }
+  for (const relative of [...sourceDirs].sort()) inspectDirectory(relative);
+  for (const relative of sourceFiles) inspectFile(relative);
+  for (const [kind, relatives] of Object.entries(sources)) entries.push(`[canonical ${kind}] ${relatives.join(", ")}`);
   for (const relative of alwaysFileTargets) inspectFile(relative);
   for (const relative of ["AGENTS.md", "CLAUDE.md"]) inspectRootGuidance(relative);
   inspectLegacyConfigTypes(root, unsafe);
@@ -291,8 +293,8 @@ function printInspection(result) {
   for (const entry of result.unsafe) console.error(entry);
 }
 
-function runCheck(root) {
-  const result = inspect(root, { includePermissions: true });
+function runCheck(root, options) {
+  const result = inspect(root, { ...options, includePermissions: true });
   printInspection(result);
   if (result.unsafe.length > 0) {
     console.error("Harness check: unsafe; no files were changed.");
@@ -306,8 +308,8 @@ function runCheck(root) {
   return 0;
 }
 
-function runInit(root) {
-  const result = inspect(root, { includePermissions: true });
+function runInit(root, options) {
+  const result = inspect(root, { ...options, includePermissions: true });
   if (result.unsafe.length > 0) {
     printInspection(result);
     console.error("Harness init refused: unsafe target; no files were changed.");
@@ -315,29 +317,11 @@ function runInit(root) {
   }
 
   let initialized;
-  if (initializerKindForPlatform() === "node") {
-    try {
-      initialized = runNodeGuidanceInitializer(root, { pluginRoot });
-    } catch (error) {
-      console.error(`Harness init failed: ${error.message}`);
-      return 2;
-    }
-  } else {
-    let bashInitializer;
-    let bashRoot;
-    try {
-      bashInitializer = toGitBashPath(initializer);
-      bashRoot = toGitBashPath(root);
-    } catch (error) {
-      console.error(`[unsafe] Harness path conversion failed: ${error.message}`);
-      console.error("Harness init refused: unsafe target; no files were changed.");
-      return 2;
-    }
-
-    initialized = spawnSync("bash", [bashInitializer, bashRoot], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+  try {
+    initialized = runNodeGuidanceInitializer(root, { ...options, pluginRoot });
+  } catch (error) {
+    console.error(`Harness init failed: ${error.message}`);
+    return 2;
   }
   if (initialized.stdout) process.stdout.write(initialized.stdout);
   if (initialized.stderr) process.stderr.write(initialized.stderr);
@@ -367,11 +351,10 @@ try {
   if (parsed?.help) {
     console.log(usage());
   } else if (parsed) {
-    if (parsed.command === "check") process.exitCode = runCheck(parsed.root);
-    else if (parsed.command === "init") process.exitCode = runInit(parsed.root);
+    if (parsed.command === "check") process.exitCode = runCheck(parsed.root, parsed);
+    else if (parsed.command === "init") process.exitCode = runInit(parsed.root, parsed);
     else if (parsed.command === "upgrade") {
-      console.error("Harness upgrade is not implemented; no files were changed.");
-      process.exitCode = 2;
+      process.exitCode = runGuidanceMigration(parsed.root, parsed);
     } else {
       console.error(`Harness command error: unknown command: ${parsed.command}`);
       console.error(usage());
@@ -381,6 +364,6 @@ try {
 } catch (error) {
   const code = error?.code ? `${error.code}: ` : "";
   console.error(`[unsafe] Harness path inspection failed (${code}${error.message})`);
-  console.error("Harness command refused; no files were changed.");
+  console.error("Harness command refused; inspect the error and any reported migration recovery path.");
   process.exitCode = 2;
 }
