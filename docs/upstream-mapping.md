@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `eb4b2ba69e7f62e6e955d65778d876798babd605` (Sprint 003 autonomy/document design, local verified candidate; unpublished)
+- Current synchronized base: `dd05b7e6717ef2de74d7c2366fb82f3de7ac5225` (Agentic Harness 0.6.0 release candidate)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -153,3 +153,11 @@ scripts/check-windows-init.mjs
 ## Sprint 003 自律実行と文書設計
 
 上流の確定したlocal commitを通常mergeし、固定SHAの本文と追加節を合成する。README・positioning検査は下流の配布識別を保持して更新する。小変更へ常時3役を要求した旧補足は置換し、質問停止・必要検証の境界を上流に揃える。公開versionは変更せず、remote push/tag/Release・installed更新は行わない。検証結果は独立評価の引き渡しに記録する。
+
+## 0.6.0 正式同期
+
+- 固定基点は `dd05b7e6717ef2de74d7c2366fb82f3de7ac5225`。既存の独立PASS済み改善候補を起点に通常mergeした。
+- 製品本文はmanifest version以外を継承。日本語overlayと配布識別のallowlistを維持した。
+- downstream所有READMEのmerge競合は、元本文の全行を保持し、Yasashii向け0.6.0正式更新手順を追加して解決した。上流READMEの変更は版番号と正式更新の案内として確認した。
+- 新しいrelease notesと公開前state原文は上流資産として同一bytesを保持する。旧基点の一覧・同期記録は履歴であり、現treeは固定SHAと同期checkerで確認する。
+- 正式公開、通常installed更新、新sessionでの確認はそれぞれ別の実行証拠で判定する。未導入editionを通常hostへ追加しない。
