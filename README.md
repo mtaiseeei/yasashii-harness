@@ -38,6 +38,30 @@ codex plugin add harness@yasashii-harness
 明示入口はClaude Codeの `/harness`、Codexの `$using-harness`。
 共通の入口は [using-harness](plugins/harness/skills/using-harness/SKILL.md) です。
 
+## インストール済みpluginの更新（0.6.0）
+
+GitHub登録の既存Yasashii marketplaceだけを更新します。
+
+```sh
+codex plugin marketplace upgrade yasashii-harness
+codex plugin add harness@yasashii-harness
+codex plugin list --marketplace yasashii-harness --json
+```
+
+Claude Codeは既存scopeを維持します。user導入の場合:
+
+```sh
+claude plugin marketplace update yasashii-harness
+claude plugin update harness@yasashii-harness --scope user
+claude plugin list --json
+```
+
+installed versionが`0.6.0`であることを確認し、新しいsessionで利用してください。
+ローカルcheckout登録の場合は既存変更を保存して正式releaseを取り込み、pluginを再installします。
+既存sessionの指示は自動で入れ替わりません。進行中の質問・Sprint・承認を引き継ぎ、
+repo文書の再移行、cache手編集、model/settings変更は行いません。
+詳細は [release notes](docs/releases/v0.6.0.md) を参照してください。
+
 ## 進め方
 
 | 依頼 | 動き |

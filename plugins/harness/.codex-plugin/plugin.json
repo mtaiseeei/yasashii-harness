@@ -1,6 +1,6 @@
 {
   "name": "harness",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "目的・決定・現在地を引き継ぎ、小変更の直接完了から大きな開発の設計・独立評価まで支えるClaude Code / Codex向け開発ハーネス。",
   "author": {
     "name": "taisei",
