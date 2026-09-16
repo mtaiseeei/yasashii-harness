@@ -86,7 +86,7 @@ claude plugin list --json
 Codexでローカルcheckoutをmarketplaceとして登録している場合、`marketplace upgrade`はそのcheckoutを
 更新しません。登録元checkoutの既存変更を保持して対象releaseを取り込み、その後`plugin add`します。
 cache内のファイルを直接編集せず、設定、導入scope、既存repoのdirtyを維持してください。
-更新後は対象pluginのinstalled versionが`0.5.5`であることを確認し、新しいセッションで利用します。
+更新後は対象pluginのinstalled versionが`0.6.0`であることを確認し、新しいセッションで利用します。
 既存repoへの一括guidance書換えやruntime/model設定の変更はplugin更新に含みません。
 
 ## 使い方

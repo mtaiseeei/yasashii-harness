@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "目的・決定・現在地を継承し、変更の影響に応じた自律実装・設計・検証を支える開発ハーネス。",
-    "version": "0.5.5"
+    "version": "0.6.0"
   },
   "plugins": [
     {
       "name": "harness",
       "source": "./plugins/harness",
       "description": "目的・決定・現在地を継承し、小変更は直接完了、通常機能は短い計画と独立レビューで進める開発ハーネス。",
-      "version": "0.5.5",
+      "version": "0.6.0",
       "author": {
         "name": "taisei"
       },

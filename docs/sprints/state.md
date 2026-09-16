@@ -1,28 +1,13 @@
 # Current work
 
-- Purpose: 小変更の自律完了と、目的・決定・現在地の継承を中心とするHarnessへ更新する。
-- Current ID: sprint-003
-- Status: done
-- Retry Count: 0
-- Spec-Issue Count: 0
-- Lineage Dispatches: 5
-- Model Tier: standard
-- Rotate: none
-- Next Planned: none
-
-## Authority and constraints
-- 承認済み: guidance/roles/skills/templates/docs、初期化・文書保守移行と検査、限定commitとYasashii同期。
-- 既存dirty・独自規則・有効な決定を保持。model/effort継承。remote push/tag/Release、通常installed更新、消費repo移行は対象外。
-- 仕様は [索引](../spec.md)、今回範囲は [契約](sprint-003.md)。
-
-## Outcome and evidence
-- 実装済み: 影響に応じた直接修正/短い計画とレビュー、条件付き読取、質問停止、最小初期化と保守移行。
-- 検証済み: source独立PASS。runtime57、migration8、Windows互換8、positioning5、loop4、manifest、Claude validate、隔離Codex install。
-  合成5シナリオと独自移行例を確認。PROJECT/currentの重複生成も修正して独立再評価PASS。
-- 下流同期済み: 実装source `1e599e4871c626fa9d2b8711901550103d968411` をYasashii `36093c406bd784d5130c0aa34df976d4b0dfab13` へ通常merge・固定SHA同期。
-  初回下流回帰44 PASSと独立PASSを保持し、最終初期化差分は下流migration8 PASS・本文同一性で増分確認。
-- 配備: 未実施（公開・通常installed更新は承認対象外）。この後のcommitは完了記録のみ。
-- 証跡: [source](../feedback/sprint-003.md)、[downstream](../feedback/sprint-003-downstream.md)、[増分](../feedback/sprint-003-incremental.md)。
-- 未解決: 必須作業なし。Windows実機・速度比較は未実施。保守移行の意味/anchor確認はAgentが行い、保護節の旧規則は拒否・未処理報告になる場合がある。
-- 次の一手: 新しい依頼から影響に応じて進める。未承認の公開や消費repo移行を開始しない。
-- 過去状態: [history](state-through-v0.5.5.md)。通常再開で全文を読む必要はない。
+- Purpose: 承認済みHarness改善を正式配布し、利用中hostと新sessionまで反映する。
+- Current ID: sprint-003（実装done、公開・導入の残作業）
+- Status: release-ready
+- 承認範囲: 両editionの0.6.0正式main/tag/Release、利用中Agenticの正式CLI更新、新規read-only session確認。
+- 制約: 元checkoutのHEAD/index/dirty、既存の文書移行原文、起動中session、model/effort、scope、他pluginを保持。
+- 実装・独立評価: [源流PASS](../feedback/sprint-003.md)、[増分PASS](../feedback/sprint-003-incremental.md)、[下流PASS](../feedback/sprint-003-downstream.md)。製品本文はこの固定候補から継承。
+- 配布候補: 0.6.0。内容・正式更新手順・未実施範囲は [release notes](../releases/v0.6.0.md)。
+- 公開済み／installed済み／新session確認済みは別の事実。候補treeだけで配備完了とは判定しない。
+- 次の一手: 両候補の配布差分を確認し、正式公開→対象host更新→新session実読込を検証する。
+- 現行仕様は [索引](../spec.md) から必要な領域だけ読む。通常開始時に全履歴を読まない。
+- 以前の承認・検証・状態の全文は [変更前原文](state-before-0.6.0-release.md) にbytesを保持。以前の公開対象外は今回の明示承認で置換した。
