@@ -4,14 +4,16 @@
 
 - 小さな挙動変更も担当Agentが直接修正・必要検証で完了できる。独立レビューやmicro契約は必須にしない。
 - 通常機能は短い計画と完成時独立レビュー。大きな開発・曖昧な要望は必要な仕様とSprintを使う。
-  その場合は installed `harness:using-harness`（plugin rootの `skills/using-harness/SKILL.md`）を読む。
+  開始・復帰時は installed `harness:using-harness`（plugin rootの `skills/using-harness/SKILL.md`）の開始・復帰の導線を読み、目的・完了条件と割込みの復帰先を確認する。
 - 現在状態 → 該当仕様・コード → 理由や矛盾がある場合だけ関連履歴。全参照先を一括読込しない。
   既存の正本を使い、現在状態の複製や定型文書群を無条件で作らない。
 - 既決事項と承認済みの可逆な実装・修理を引き継ぐ。重要な未決判断と未承認の副作用だけを確認する。
   高リスク操作は対象・影響・復旧方法と承認を実行前に確認し、実行後検証する。
 - 既存dirty、独自規則、資格情報を保護する。初期化はno-overwrite。承認済み文書保守はpreviewを使う。
   文書保守の承認は無関係なmodel/effort設定・権限の変更やGit公開を許可しない。
-- 継続状態は一つの正本を更新し、過去詳細は履歴へ保持する。実装済み・検証済み・配備済みを区別する。
+- 評価前はplugin rootの `skills/harness-loop/references/evaluation.md` を読み、修正対象と見送りを選別する。
+- 再開・引き渡し時はplugin rootの `skills/harness-loop/references/state.md` を読み、現在地を置換更新する。
+  継続状態は一つの正本を使い、過去詳細は履歴へ保持する。実装済み・検証済み・配備済みを区別する。
   Sprintで分担する場合はPlannerが仕様、Generatorが実装、独立Evaluatorが評価、オーケストレーターだけがstateを書く。
 - model/effortは既定でhost継承。明示設定はdispatch時のresolverに従い、推測変換しない。
 

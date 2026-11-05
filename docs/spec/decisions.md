@@ -1,5 +1,21 @@
 # 現行判断と置換関係
 
+## 2026-11-05 — 収束・現在地・本題復帰（v0.6.1）
+
+[Issue #12](https://github.com/mtaiseeei/agentic-harness/issues/12) → [#13](https://github.com/mtaiseeei/agentic-harness/issues/13) →
+[#14](https://github.com/mtaiseeei/agentic-harness/issues/14) → [#15](https://github.com/mtaiseeei/agentic-harness/issues/15) の順に、
+Planner→Generator→Evaluatorで一件ずつ修正・独立評価するユーザー決定を採用する。基点はv0.6.0 / `dd05b7e`、次patchはv0.6.1。
+目的・範囲・期待挙動はIssueで確定済みのためGrillingを省略する。実装方法は委任済みで、新しい製品判断を追加しない。
+
+- #12はproduct findingを無条件で全修正する扱いを、修正閾値・具体的必須例外・見送り再掲抑制に置換する。
+- #13は「短く保つ」という既存方針を、現在地の置換更新・原文保護・整理未完了時の継続手順へ具体化する。
+- #14は元目的と割込みの関係を明記し、修理後に承認済み本題へ復帰する。
+- #15は詳細正本と短い配布導線を整合し、source / installed / 実読込 / repo適用を区別する。
+
+Sprint 003の小変更直接完了、保護境界、model / effort継承を維持する。今回の4契約を将来の全作業へ強制しない。
+実業務repo・個人global設定・installed cache・無関係な下流repoの変更は含まない。公開はPRまでを成果候補とし、
+main merge / tag / Release / 全host更新へ過去承認を流用しない。
+
 ## 2026-09-12 — 承認済み自律化（Sprint 003）
 
 ユーザー承認を根拠とする製品設計であり、公式標準ではない。

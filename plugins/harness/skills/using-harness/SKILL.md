@@ -8,6 +8,14 @@ description: 開発の規模と影響に応じて直接修正・短い計画と�
 目的・既決事項・現在地を引き継ぎ、依頼に必要な設計と検証で完成まで進める。
 特定roleとしてdispatchされたsubagentは入口を繰り返さず担当に集中する。
 
+## 開始・復帰の導線
+
+開始・復帰時は元の目的・完了条件と今回の担当範囲を確認し、割込みがあれば終了条件と具体的復帰先を保持する。
+割込みを始める/終えるときは[本題への復帰](../harness-loop/SKILL.md#割込みから本題へ戻る)を読み、修理後は承認済みの本題へ戻る。
+再開・引き渡し時は[state](../harness-loop/references/state.md)を読み、既存の現在地を確認・置換更新する。
+評価前は[評価正本](../harness-loop/references/evaluation.md)を読み、外部レビューや自分の発見も同じ規則で選別する。
+この導線は小変更へSprint・独立レビュー・定型文書群を追加する指示ではない。
+
 ## 開発依頼
 
 まず現在の依頼と既存承認を確認し、必要なら既存の現在状態と該当仕様・コードだけを読む。
@@ -34,7 +42,7 @@ plugin root（このSkillの2階層上）の `scripts/harness.mjs` をNode.jsで
 
 - `init --root <repo>`: 不足分だけno-overwrite生成。既存の仕様・状態の正本を利用する。
 - `check --root <repo>`: 読み取り専用の導入確認。最新版との判定ではない。
-- `upgrade --root <repo>`: 既存repo文書の保守移行preview。適用方法は必要時だけ
+- `upgrade --root <repo>`: 既存repo文書の保守移行preview。候補作成・適用時は
   [文書移行](../harness-loop/references/migration.md)を読む。
 
 管理操作だけなら結果を報告して終了し、PlannerやSprintを開始しない。

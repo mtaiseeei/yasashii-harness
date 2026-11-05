@@ -27,6 +27,16 @@
 - 依頼の目的・挙動・副作用・合格基準が実質的に変わる場合は既存承認を確認し、未承認部分だけ確認する。
   利用者が明示承認した再設計を旧規則によって止めない。沈黙を承認とみなさない。
 
+## 割込みと元の依頼
+
+小問題Bへの「直して」「それもお願い」はBへの対応の承認であり、進行中の本題Aの取消・完了・目的変更ではない。
+明示的な取消・置換があれば現在の目的と復帰先を更新し、旧Aへ戻らない。
+割込みは本題の完了を妨げる問題、今回の回帰、具体的な重大欠陥、利用者が明示的に優先した作業に限る。
+[評価正本](evaluation.md)で修正対象になっても、数値閾値だけを理由に無関係な作業を本題より先に実行しない。
+修理中に見つけた、本題を妨げない追加改善・既存の軽微問題Cは残課題へ置き、割込みを連鎖させない。
+開始前に元目的・完了条件を保持し、割込み理由・終了条件・本題の具体的な次の一手を現在地へ記す。
+修理後の復帰と外部待ちは[Loopの復帰手順](../SKILL.md#割込みから本題へ戻る)に従う。
+
 ## 受け入れ基準・rubric の厳格化ゲート（ユーザー承認必須）
 
 - active な Sprint に対する厳格化方向の変更 — 受け入れ基準の追加、閾値の引き上げ、証拠形式の追加・変更 —
@@ -43,7 +53,8 @@
 検証は製品を出荷するための手段であり、検証基盤の完成度自体は製品要件ではない。
 次のガードで「検証のための検証」への逸脱を検知し、ループではなくユーザーへ返す。
 
-- **finding の対象区分**: 各findingは `product` / `verification-infra` に分け、不明なら `product` とする。検証基盤だけの軽微な指摘は改善提案に残せるが、必要な回帰が実行不能・失敗のまま「回帰なし」をPASSにしない。
+- **finding の対象区分**: 各findingは `product` / `verification-infra` に分け、不明なら `product` とする。
+  修正・見送りは先に[評価正本](evaluation.md)で選別する。見送りを分類替えで差し戻さず、必須検証の未実行は仮説と区別してPASSにしない。
 - **限定修理**: 既存テストのパス・fixture・起動設定など局所的な破損は、期待結果・合否条件・証拠要件を変えず、新規基盤を増やさずに直せるならオーケストレーターが根拠を記録してGeneratorへ戻せる。対象区分は `verification-infra` のまま、分類は `verification-scope-issue` として限定修理可能であることを記録し、製品の欠陥に偽装しない。Evaluatorは修理せず独立再評価する。限定修理は同一Sprintで1回まで自動で試し、再失敗・修理範囲不明・要求拡大ならユーザーへ選択肢を返す。Retry CountとSpec-Issue Countは消費せず、Lineage Dispatchesと検証のみdiffのガードは通常どおり適用する。
   resolverは既存入力だけを使う: `--event retry`、`--failure-kind`は省略、`--retry-count`は据え置き、`--current-model-tier`はstateの値。`verification-scope-issue`分類はfeedback/stateに残し、resolverへ未対応の分類を渡さない。
 - **検証要求の判断が必要な場合**: 新しい証拠形式・新規collector、期待結果や検証範囲の変更、原因不明や限定修理で解消しない問題は自動修理せず `verification-scope-issue` としてユーザーへ返す。
@@ -67,8 +78,11 @@
 ### Step 4: 遷移（オーケストレーターが state.md を更新）
 
 feedback の判定に応じて、オーケストレーターが必ず state.md を更新してから次へ進む。
+不合格遷移の前に評価正本の選別を確認し、FAILを未達条件または修正対象findingへ対応させる。
+見送りの減点・仮説の未確認化・分類替えだけでは不合格遷移を開始しない。
 
 - **合格** → Status を `done`、Retry CountとSpec-Issue Countを0にし、`Current ID`を次のスプリントへ進める。
+  割込みの完了なら、次の新規作業より[記録した本題の復帰先](../SKILL.md#割込みから本題へ戻る)を優先する。
   次Sprintがある場合は、`Model Tier`を最後に実dispatchした値のまま保持し、`Rotate: none`としてStep 2へ進む。
   Step 2がそのtierを`currentModelTier`としてresolverへ渡し、desired tierとの比較後にstateを更新してからdispatchする。
   次のメインスプリントへ進むときは`Lineage Dispatches`を0に戻す（同一Base Sprintのpatch群へ進む場合は保持する）。
@@ -84,7 +98,7 @@ feedback の判定に応じて、オーケストレーターが必ず state.md �
   目的・挙動・受け入れ基準・閾値・証拠要件が実質的に変わる場合はユーザーへ差分を確認する。意味不変か不明なら確認する。
   同一スプリントで Spec-Issue Count が `limits.max_spec_issue_returns`（既定 2）に達したら、
   Planner との往復を続けずユーザーへ状況と選択肢を報告する。
-- **不合格（verification-scope-issue）** → 上の限定修理条件をすべて満たし、まだ試していなければ同じSprintのGeneratorへ1回だけ戻す。それ以外はRetry CountとSpec-Issue Countを消費せず、(a) 修正 (b) 証拠水準を下げて受理 (c) Non-scope化 の影響を示し、ユーザーへ判断を返す。未確認項目をPASSにはしない。
+- **不合格（verification-scope-issue）** → 上の限定修理条件をすべて満たし、まだ試していなければ同じSprintのGeneratorへ1回だけ戻す。それ以外はRetry CountとSpec-Issue Countを消費せず、(a) 修正 (b) 証拠水準を下げて受理 (c) Non-scope化 の影響を示し、ユーザーへ判断を返す。未確認の必須項目をPASSにはしない。
 - **ユーザー判断による完了（accept-as-is）** → ユーザーが残余リスクを明示的に引き受けて完了を選んだ場合、
   Evaluator の評価結果（未達項目を含む）を feedback に保持したまま、Status を `done-by-user-decision` にし、
   理由と未達項目への参照を state.md に記録して次へ進む。Evaluator の記録は書き換えない。

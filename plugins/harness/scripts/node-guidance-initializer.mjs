@@ -15,7 +15,9 @@ export const seedFiles = new Map([
 `],
   ["docs/sprints/state.md", `# Current State
 
-<!-- Update current state; retain prior detail in history. Do not duplicate this source in NEXT_SESSION or PROJECT. -->
+<!-- Replace this one current section; keep dated reports in existing history. Do not duplicate this source in NEXT_SESSION or PROJECT. -->
+
+## 現在地
 
 - Purpose: TBD
 - Current work: none
