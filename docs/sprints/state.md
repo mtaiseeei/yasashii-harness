@@ -11,13 +11,13 @@
 - Lineage Dispatches: 8
 - Model Tier: standard
 - Rotate: none
-- Next Planned: [通常機能の計画](../progress/state-history-archive.md)に沿って履歴退避を実装し、独立評価後に5repoへ適用する。以下のSprint値は完了済み#12〜15の記録で、新作業の予算に流用しない。
-- 今回: 上流PR16・下流PR9マージ、両v0.6.1公開と両host導入済み。実適用の4repoは短い現在地＋旧本文で物理短縮未完了、六鍋stateはrepo外履歴リンクで未適用。11/6承認で残件を進行中。
+- Next Planned: 今回の修正・公開・ローカル適用は完了。次の利用者依頼へ。以下のSprint値は完了済み#12〜15の記録で、新作業の予算へ流用しない。
+- 今回: 上流PR17・下流PR10マージ、両v0.6.2公開と両host導入済み。5repoのstate物理短縮・原文二重保管・文書保存commit・installed実読込・global整理を完了。[実装と運用結果](../progress/state-history-archive.md)。
 - 合格済み: [#12](../feedback/sprint-004.md)、[#13](../feedback/sprint-004-patch-001.md)、[#14](../feedback/sprint-004-patch-002.md)、[#15](../feedback/sprint-004-patch-003.md)。
 - 承認: 11/5のmerge/release・下流反映・両host更新・Mac mini対象4系統5repoへの適用と実文書Fableレビュー、11/6の残り5項目を進める指示。
 - 境界: 対象5repoの文書とglobalのreview-convergenceブロックだけ。業務コード/本番DB/外部送信/他者セッション/model/effortは変更しない。installed cacheは直接編集せず正式更新する。
 - Runtime: native Codex fresh role、model/effort=inherit。明示overrideのlaunch検証は対象外。
-- 検証基点: v0.6.0 dd05b7e。positioning 5、loop 4、runtime 57、migration 8、Claude manifest validateがPASS。
+- 検証: v0.6.2 source 082e296。positioning 5、loop 4、runtime 57、migration 12、Claude manifest validate、Fable独立評価がPASS。下流同期回帰44件PASS。
 - 契約: [#12](sprint-004.md)、[#13](sprint-004-patch-001.md)、[#14](sprint-004-patch-002.md)、[#15](sprint-004-patch-003.md)。
 - 正本: [仕様索引](../spec.md)、[評価基準](../spec/rubric.md)。
 - 旧状態: [原文](state-before-review-convergence.md)は履歴。過去のrelease承認を今回へ流用しない。

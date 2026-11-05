@@ -22,4 +22,10 @@
 - migration 12件、positioning 5件、loop 4件、runtime 57件がPASS。CRLF・最終改行なしを含む10k行の原文保全、不正計画の拒否、再適用、archive破損の拒否を確認した。
 - 2026-11-06、隔離checkoutでFable（`claude -p`）が独立評価しPASS。コード必須修正なし。実適用前に原文の別保管を作る手順条件を採用した。
 - 見送り: Agentが意味を誤判定したpreserve（F1/I6）、例へのplan.id補足（F2/I2）、旧検証基点の件数表記（F1/I1）。意味の引継ぎは実repo候補の独立レビューで確認する。
-- 公開・host更新・5repo適用は後続の運用作業。sourceのテスト合格を実適用完了とは扱わない。
+- 上流PR17・下流PR10をマージし、両v0.6.2を公開。下流の正式同期回帰44件がPASS。
+- 両hostのClaude/Codexを既存導入元・scopeで0.6.2へ更新し、入口・loop・評価・state・移行の5fileを源流とhash照合した。installed実パスの読込も確認。
+- 承認済み5repoのstate短縮は独立意味レビュー後に適用完了。原文はrepo内archiveとhost内別保管の二箇所へ残し、適用時のindex/runtime/無関係差分不変を確認。実文書・具体的な業務証拠は非公開の運用記録へ保持する。
+- 意味レビューの必須指摘1件（承認版と実配備版の相違の明示、F3/I7）を修正し、増分再評価PASS。新規Claude読込でも5repoの現在地と承認境界を確認できた。
+- 文書だけの保存用commitを5repoに作成。remoteあり4repoは保存用tagへpushし、業務main・作業中indexを変更しない。配備/チェック0をGitHubで確認。remoteなし1repoはlocalのみ。
+- global暫定ブロックは存在するhostの2fileを公式7行版へ縮小し、周辺bytesを保持。もう一方のhostは該当ブロックなしで変更不要。
+- 限界: 進行中の他者セッションは再起動しておらず、自動的に旧文脈が消えたとは扱わない。業務repoのmainへの文書mergeは自動配備を伴うため今回対象外。長期利用での再肥大化・時間削減率は未測定。
