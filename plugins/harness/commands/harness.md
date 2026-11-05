@@ -8,10 +8,10 @@ argument-hint: <作りたいもの> | init | check | upgrade
 - `/harness init`: `node "$CLAUDE_PLUGIN_ROOT/scripts/harness.mjs" init --root "$(pwd)"` を実行する。
 - `/harness check`: `node "$CLAUDE_PLUGIN_ROOT/scripts/harness.mjs" check --root "$(pwd)"` を実行する。
 - `/harness upgrade`: `node "$CLAUDE_PLUGIN_ROOT/scripts/harness.mjs" upgrade --root "$(pwd)"` で文書移行preview。
-  必要時だけ[移行手順](../skills/harness-loop/references/migration.md)を読み、既存承認範囲で候補を準備・適用する。
+  候補作成・適用時は[移行手順](../skills/harness-loop/references/migration.md)を読み、既存承認範囲で候補を準備・適用する。
 
 init/check/upgradeだけなら結果を報告し、PlannerやSprintを開始せず、harness-loop に進まない。
-それ以外は [using-harness](../skills/using-harness/SKILL.md) へ依頼と既決事項を渡す。
+それ以外は [using-harness](../skills/using-harness/SKILL.md) へ元の目的・完了条件・既決事項と、割込みがあれば復帰先を渡し、開始・復帰の導線に従う。
 未確定の製品判断があればPlannerのGrilling gateに従う。明確な承認済み依頼を再承認待ちにしない。
 通常開発の不足分生成も同じ `scripts/harness.mjs init` を使い、既存ファイルは上書きしない。
 ホストが対応する場合は各roleをdispatchし、不可ならroleごとの独立作業単位に分離する。

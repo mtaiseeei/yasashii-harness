@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `dd05b7e6717ef2de74d7c2366fb82f3de7ac5225` (Agentic Harness 0.6.0 release candidate)
+- Current synchronized base: `1542ce026e1ed4d5d08999edadf8111bb97ef21f` (Agentic Harness 0.6.1 source)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -51,14 +51,24 @@ docs/feedback/sprint-001.md
 docs/feedback/sprint-003-downstream.md
 docs/feedback/sprint-003-incremental.md
 docs/feedback/sprint-003.md
+docs/feedback/sprint-004-patch-001.md
+docs/feedback/sprint-004-patch-002.md
+docs/feedback/sprint-004-patch-003.md
+docs/feedback/sprint-004.md
 docs/harness-guidance.md
 docs/progress/sprint-001-patch-001.md
 docs/progress/sprint-001.md
 docs/progress/sprint-003.md
+docs/progress/sprint-004-patch-001.md
+docs/progress/sprint-004-patch-002.md
+docs/progress/sprint-004-patch-003.md
+docs/progress/sprint-004.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
 docs/releases/v0.5.4-validation.md
 docs/releases/v0.5.5.md
+docs/releases/v0.6.0.md
+docs/releases/v0.6.1.md
 docs/spec.md
 docs/spec/constraints.md
 docs/spec/decisions.md
@@ -72,6 +82,12 @@ docs/spec/ui.md
 docs/sprints/sprint-001-patch-001.md
 docs/sprints/sprint-001.md
 docs/sprints/sprint-003.md
+docs/sprints/sprint-004-patch-001.md
+docs/sprints/sprint-004-patch-002.md
+docs/sprints/sprint-004-patch-003.md
+docs/sprints/sprint-004.md
+docs/sprints/state-before-0.6.0-release.md
+docs/sprints/state-before-review-convergence.md
 docs/sprints/state-through-v0.5.5.md
 docs/sprints/state.md
 plugins/harness/.claude-plugin/plugin.json
@@ -161,3 +177,11 @@ scripts/check-windows-init.mjs
 - downstream所有READMEのmerge競合は、元本文の全行を保持し、Yasashii向け0.6.0正式更新手順を追加して解決した。上流READMEの変更は版番号と正式更新の案内として確認した。
 - 新しいrelease notesと公開前state原文は上流資産として同一bytesを保持する。旧基点の一覧・同期記録は履歴であり、現treeは固定SHAと同期checkerで確認する。
 - 正式公開、通常installed更新、新sessionでの確認はそれぞれ別の実行証拠で判定する。未導入editionを通常hostへ追加しない。
+
+## 0.6.1 正式同期
+
+- 固定基点は `1542ce026e1ed4d5d08999edadf8111bb97ef21f`（上流PR #16のmerge commit）。通常mergeし、上流全ファイル一覧をこのtreeへ更新した。削除はなく、Sprint 004の仕様補足・progress・feedback・release notes・state履歴を上流資産として追加した。
+- managed本文、実装、templates、上流stateと履歴は固定SHAのbytesを保持し、既存のyasashii追加節と配布識別allowlistだけを合成した。
+- downstream所有READMEの競合はやさしいシリーズの説明を保持して解消し、0.6.1更新、修正対象と見送りの区別、単一現在地、本題復帰、旧global規則の移行案内を反映した。上流のpositioning検査・LICENSEには今回変更がなく、下流識別を維持した。
+- 既存overlayは修正対象と見送りの選別、現在地の置換更新、割込み後の元依頼への復帰を妨げない。model/effort設定とgrilling本文は変更しない。
+- source公開、installed更新、新sessionの実読込、利用repoへの適用は別工程として検証する。
