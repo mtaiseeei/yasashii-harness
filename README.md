@@ -38,7 +38,7 @@ codex plugin add harness@yasashii-harness
 明示入口はClaude Codeの `/harness`、Codexの `$using-harness`。
 共通の入口は [using-harness](plugins/harness/skills/using-harness/SKILL.md) です。
 
-## インストール済みpluginの更新
+## インストール済みpluginの更新（0.6.1）
 
 GitHub登録の既存Yasashii marketplaceだけを更新します。
 
