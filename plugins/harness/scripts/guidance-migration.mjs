@@ -29,11 +29,11 @@ function documentPath(root, relative) {
   if (!stat(file)?.isFile()) throw new Error(`expected a regular document: ${relative}`);
   return file;
 }
-function protectedText(content) {
+function protectedText(content, archiveSections = []) {
   const lines = [];
   let protectedSection = false;
   let sectionDepth = 0;
-  for (const line of content.split(/\r?\n/u)) {
+  for (const [index, line] of content.split(/\r?\n/u).entries()) {
     const heading = /^(#{1,6})\s+(.+)/u.exec(line);
     if (heading) {
       if (heading[1].length <= sectionDepth) protectedSection = false;
@@ -41,12 +41,38 @@ function protectedText(content) {
         protectedSection = true; sectionDepth = heading[1].length;
       }
     } else if (line.trim() && (protectedSection || /^\s*[-*]\s+\[ \]/u.test(line)
-      || /^\s*[-*]?\s*(?:Unresolved|Authorization|Constraints|未解決|承認|制約)\s*[:：/]/iu.test(line))) lines.push(line);
+      || /^\s*[-*]?\s*(?:Unresolved|Authorization|Constraints|未解決|承認|制約)\s*[:：/]/iu.test(line))) {
+      if (!archiveSections.some(({ startLine, endLine }) => startLine <= index + 1 && index + 1 <= endLine)) lines.push(line);
+    }
   }
   return lines;
 }
 function links(content) {
   return [...content.matchAll(/\[[^\]]*\]\(<?([^\s)>]+)>?(?:\s+"[^"]*")?\)/gu)].map((match) => match[1]);
+}
+function reviewedArchiveSections(root, id, entry, original) {
+  if (entry.archiveSections === undefined) return [];
+  const sections = entry.archiveSections;
+  if (!Array.isArray(sections) || !sections.length || !entry.preserve.length
+    || (entry.content.match(/^## 現在地\s*$/gmu) ?? []).length !== 1) throw new Error(`archiveSections require reviewed ranges, live preserved text and one current section: ${entry.path}`);
+  const archivePath = path.join(root, `.harness/migrations/${id}/originals/${entry.path}`);
+  const hasArchiveLink = links(entry.content).some((link) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#)/iu.test(link)) return false;
+    try { return path.resolve(path.dirname(path.join(root, entry.path)), decodeURIComponent(link.split("#")[0])) === archivePath; } catch { return false; }
+  });
+  if (!hasArchiveLink) throw new Error(`archiveSections require a link to this document's original archive: ${entry.path}`);
+  // Keep each original line ending: the reviewed digest binds exact UTF-8 bytes,
+  // including CRLF and the presence or absence of a final newline.
+  const lines = original.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
+  let previousEnd = 0;
+  for (const section of sections) {
+    if (!section || !Number.isSafeInteger(section.startLine) || !Number.isSafeInteger(section.endLine)
+      || section.startLine <= previousEnd || section.endLine < section.startLine || section.endLine > lines.length
+      || !/^[a-f0-9]{64}$/u.test(section.sha256) || typeof section.reason !== "string" || !section.reason.trim()) throw new Error(`invalid or overlapping archiveSections: ${entry.path}`);
+    if (sha(lines.slice(section.startLine - 1, section.endLine).join("")) !== section.sha256) throw new Error(`archive section hash mismatch: ${entry.path}:${section.startLine}-${section.endLine}`);
+    previousEnd = section.endLine;
+  }
+  return sections;
 }
 function verifyLinks(root, relative, content, plannedArchives = new Set()) {
   for (const link of links(content)) {
@@ -85,10 +111,16 @@ function readPlan(root, planPath) {
     const after = Buffer.from(entry.content, "utf8");
     const afterSha = sha(after);
     if (currentSha !== entry.beforeSha256 && currentSha !== afterSha) throw new Error(`stale source: ${entry.path}; regenerate and review the plan against current bytes`);
-    if (currentSha !== afterSha) {
-      const content = before.toString("utf8");
-      if (!Buffer.from(content, "utf8").equals(before)) throw new Error(`document is not UTF-8: ${entry.path}`);
-      for (const text of [...protectedText(content), ...entry.preserve]) {
+    let original = before;
+    if (currentSha === afterSha && entry.archiveSections !== undefined) {
+      original = fs.readFileSync(safePath(root, `.harness/migrations/${id}/originals/${entry.path}`));
+      if (sha(original) !== entry.beforeSha256) throw new Error(`original archive hash mismatch: ${entry.path}`);
+    }
+    const content = original.toString("utf8");
+    if (!Buffer.from(content, "utf8").equals(original)) throw new Error(`document is not UTF-8: ${entry.path}`);
+    const archiveSections = reviewedArchiveSections(root, id, entry, content);
+    if (currentSha !== afterSha || archiveSections.length) {
+      for (const text of [...protectedText(content, archiveSections), ...entry.preserve]) {
         if (!content.includes(text) || !entry.content.includes(text)) throw new Error(`protected text missing in ${entry.path}: ${text}`);
       }
       for (const text of entry.retire) {
@@ -129,6 +161,7 @@ export function runGuidanceMigration(root, { plan: planPath, apply = false } = {
   console.log(`Harness maintenance ${apply ? "apply" : "preview"}: ${id}`);
   for (const entry of entries) {
     console.log(`${entry.path}: ${entry.before.length} -> ${entry.after.length} bytes; ${entry.currentSha} -> ${entry.afterSha}`);
+    for (const section of entry.archiveSections ?? []) console.log(`  archive lines ${section.startLine}-${section.endLine}, sha256=${section.sha256}; reviewed reason: ${section.reason}`);
     if (entry.currentSha !== entry.afterSha) {
       // A complete before/after diff is intentional: no hidden truncation conceals
       // removed custom instructions or unresolved text in a reviewed replacement.
@@ -137,7 +170,7 @@ export function runGuidanceMigration(root, { plan: planPath, apply = false } = {
       for (const line of entry.content.split("\n")) console.log(`+${line}`);
     }
   }
-  console.log("Checks: source hashes, document paths, explicit preserved text, unresolved/approval sections, retired rules and relative links passed. Semantic completeness remains the reviewing Agent's responsibility.");
+  console.log("Checks: source hashes, document paths, explicit preserved text, unresolved/approval sections, reviewed archive ranges, retired rules and relative links passed. Semantic completeness remains the reviewing Agent's responsibility.");
   if (!apply) { console.log("Preview only; no files were changed."); return 0; }
   if (!changed.length) { console.log("Already applied; no files were changed."); return 0; }
   if (changed.length !== entries.filter((entry) => entry.beforeSha256 !== entry.afterSha).length) throw new Error("partially applied plan; inspect recovery history before preparing a new plan");
@@ -157,6 +190,7 @@ export function runGuidanceMigration(root, { plan: planPath, apply = false } = {
     const backup = path.join(backupRoot, "originals", entry.path);
     fs.mkdirSync(path.dirname(backup), { recursive: true, mode: 0o700 });
     fs.writeFileSync(backup, entry.before, { flag: "wx", mode: 0o600 });
+    if (sha(fs.readFileSync(backup)) !== entry.currentSha) throw new Error(`original backup verification failed: ${entry.path}`);
   }
   const written = [];
   const temporary = [];
@@ -172,6 +206,7 @@ export function runGuidanceMigration(root, { plan: planPath, apply = false } = {
     }
     for (const entry of changed) {
       if (sha(fs.readFileSync(entry.file)) !== entry.afterSha) throw new Error(`post-write verification failed: ${entry.path}`);
+      if (sha(fs.readFileSync(path.join(backupRoot, "originals", entry.path))) !== entry.beforeSha256) throw new Error(`original archive hash mismatch: ${entry.path}`);
       verifyLinks(root, entry.path, entry.content);
     }
     fs.writeFileSync(path.join(backupRoot, "result.json"), JSON.stringify({ status: "applied", files: changed.map(({ path: filePath, beforeSha256, afterSha }) => ({ path: filePath, beforeSha256, afterSha })) }, null, 2) + "\n", { flag: "wx", mode: 0o600 });

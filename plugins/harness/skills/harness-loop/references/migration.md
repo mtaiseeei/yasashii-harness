@@ -61,6 +61,44 @@ unresolved/approval/constraint sections. This mechanical check does not recogniz
 all natural-language decisions. The reviewing Agent must check any other active
 rules and state meaning, then include exact important fragments in `preserve`.
 
+### Reviewed history archival (v0.6.2)
+
+Old logs can contain superseded approval requests and unchecked tasks. After
+reviewing current meaning, an Agent may add `archiveSections` to that file's plan:
+
+```json
+"archiveSections": [{
+  "startLine": 1,
+  "endLine": 120,
+  "sha256": "<SHA256 of these original UTF-8 lines, including line endings>",
+  "reason": "Historical log reviewed; effective constraints, unresolved work and counters retained in current state."
+}]
+```
+
+Ranges are 1-based, inclusive, ascending and non-overlapping. Hash the original
+lines including LF/CRLF endings and final-newline presence, without normalization.
+The whole-document `beforeSha256` still binds the source. Each range needs a concrete
+review reason. The CLI never decides an approval is obsolete or infers a summary.
+Reconcile current work and later updates before classifying a range. A mixed legacy
+state may classify its whole old body only after retaining its effective meaning in
+the new current section and independently reviewing that semantic handoff.
+
+This option requires one `## 現在地`, nonempty `preserve` containing effective exact
+fragments that must remain live, and a Markdown link to this document's own
+`.harness/migrations/<id>/originals/<path>` archive. Protected lines inside reviewed
+ranges may live solely in that byte-preserved original. Protected lines outside the
+ranges and every explicit `preserve` fragment must still be live. Retain effective
+approvals, unresolved work, constraints and counters, not a token validation fragment.
+Large effective details may reference existing current specs; keep critical execution
+limits in the current section.
+
+Original bytes are checked after apply and on no-op reapplication. Historical links
+inside the raw original are text and are never followed during migration; resolve
+them against their original document location only if later needed. Live-candidate
+path, symlink and link validation is unchanged. Do not carry obsolete external
+temporary links into the new current section. Unreviewed or mismatched ranges fail
+before mutation; this is not a general protection bypass.
+
 For a large state, start from the latest explicit user instruction and current sources.
 Search across the source for the relevant work's approvals, constraints, unresolved
 items, counters and return destination; do not truncate inspection at the first 200
@@ -116,7 +154,10 @@ reported archive before recovery. In-process failures attempt rollback only whil
 the document still equals this command's output, so another writer's edit is not
 reverted. This is a local maintenance operation, not a crash-proof transaction.
 
-If a compact candidate fails protection checks, retain the exact original body and
+If a compact candidate fails protection checks, distinguish effective text from
+reviewed history using the explicit archival option above. Never silently classify
+unknown approvals as history. If current meaning cannot be safely reconciled,
+retain the exact original body and
 prepare a fallback candidate in the same state: one short `## 現在地` section followed
 by the explicitly marked old body. If a current section already exists, replace it
 rather than stacking another one. Reuse preview/apply and preserve protected text;

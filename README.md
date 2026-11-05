@@ -38,7 +38,7 @@ codex plugin add harness@yasashii-harness
 明示入口はClaude Codeの `/harness`、Codexの `$using-harness`。
 共通の入口は [using-harness](plugins/harness/skills/using-harness/SKILL.md) です。
 
-## インストール済みpluginの更新（0.6.1）
+## インストール済みpluginの更新（0.6.2）
 
 GitHub登録の既存Yasashii marketplaceだけを更新します。
 
@@ -56,15 +56,15 @@ claude plugin update harness@yasashii-harness --scope user
 claude plugin list --json
 ```
 
-対象版の公開後、installed versionが`0.6.1`であることを確認してください。
+対象版の公開後、installed versionが`0.6.2`であることを確認してください。
 新しいsessionで入口と評価・現在地の正本を実際に読み、進行中の作業・承認を引き継ぎます。
 ローカルcheckout登録の場合は既存変更を保存して正式releaseを取り込み、pluginを再installします。
 既存sessionの指示は自動で入れ替わりません。進行中の質問・Sprint・承認を引き継ぎ、
 repo文書の再移行、cache手編集、model/settings変更は行いません。
 source公開、installed更新、新しいsessionでの読込、利用repo文書への適用は別々に確認します。
-詳細は [0.6.1の変更内容と適用範囲](docs/releases/v0.6.1.md) を参照してください。
+詳細は [0.6.2の変更内容と適用範囲](docs/releases/v0.6.2.md) を参照してください。
 
-0.6.1では、レビューで必ず直す問題と見送る改善を分け、見送りだけで確認の往復を増やしません。
+0.6.2では、レビューで必ず直す問題と見送る改善を分け、見送りだけで確認の往復を増やしません。
 現在地は一つの欄を更新し、割込み修理が終わったら承認済みの元の依頼へ戻ります。
 
 ## 進め方

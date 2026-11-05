@@ -272,6 +272,70 @@ try {
     }
     assert.deepEqual(fs.readdirSync(path.join(root, ".harness/migrations")), archives);
   });
+  check("reviewed historical ranges archive exact old bytes without following old external links", () => {
+    const root = fixture("reviewed-archive");
+    const active = ["- Authorization: local tests only; no deployment.", "- Unresolved: owner approval pending.", "- Lineage Dispatches: 7"];
+    const old = ["# Old", "## Approval history", "- [ ] Superseded approval request.", "[Old temporary evidence](../../../../outside/missing.md)", ...Array(9990).fill("Old event."), ...active].join("\r\n");
+    write(root, "docs/state.md", old);
+    write(root, ".git/index", "existing staged bytes\n");
+    write(root, "owner.txt", "dirty owner content\n");
+    const id = "reviewed-history-01";
+    const content = "# State\n\n## 現在地\n\n" + active.join("\n") + `\n[Original](../.harness/migrations/${id}/originals/docs/state.md)\n`;
+    const section = { startLine: 1, endLine: old.split(/\r?\n/u).length, sha256: digest(old), reason: "Reviewed historical log; effective approval, unresolved work and counter retained in live preserve." };
+    const file = plan(root, [{ path: "docs/state.md", content, preserve: active, archiveSections: [section] }]);
+    const manifest = JSON.parse(fs.readFileSync(file)); manifest.id = id; fs.writeFileSync(file, JSON.stringify(manifest));
+    const before = snapshot(root);
+    let result = command(root, ["upgrade", "--plan", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(snapshot(root), before);
+    result = command(root, ["upgrade", "--plan", file, "--apply"]);
+    assert.equal(result.status, 0, result.stderr);
+    const backup = path.join(root, `.harness/migrations/${id}/originals/docs/state.md`);
+    assert.equal(fs.readFileSync(backup, "utf8"), old);
+    assert.equal(fs.readFileSync(path.join(root, "docs/state.md"), "utf8"), content);
+    for (const name of [".git/index", "owner.txt"]) assert.equal(snapshot(root)[name], before[name]);
+    const applied = snapshot(root);
+    result = command(root, ["upgrade", "--plan", file, "--apply"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(snapshot(root), applied);
+    fs.appendFileSync(backup, "corruption");
+    const corrupted = snapshot(root);
+    result = command(root, ["upgrade", "--plan", file, "--apply"]);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /original archive hash mismatch/);
+    assert.deepEqual(snapshot(root), corrupted);
+  });
+  check("archive opt-in cannot drop live preserve, unclassified protected text or path protections", () => {
+    const root = fixture("archive-rejections");
+    const old = "# Old\n- [ ] Obsolete request.\n- Constraints: keep active boundary.\n";
+    write(root, "docs/state.md", old);
+    const id = "archive-reject-01";
+    const keep = "- Constraints: keep active boundary.";
+    const content = `# State\n## 現在地\n${keep}\n[Original](../.harness/migrations/${id}/originals/docs/state.md)\n`;
+    const range = { startLine: 1, endLine: 2, sha256: digest("# Old\n- [ ] Obsolete request.\n"), reason: "Superseded request; current boundary retained." };
+    const cases = [
+      { archiveSections: undefined, pattern: /protected text missing/ },
+      { archiveSections: [{ ...range, sha256: "0".repeat(64) }], pattern: /section hash mismatch/ },
+      { archiveSections: [range, range], pattern: /overlapping/ },
+      { archiveSections: [{ ...range, endLine: 4 }], pattern: /invalid/ },
+      { archiveSections: [{ ...range, reason: "" }], pattern: /invalid/ },
+      { preserve: [], pattern: /live preserved text/ },
+      { content: content.replace(keep, "- Work: continue."), preserve: ["# Old"], pattern: /protected text missing/ },
+      { content: content.replace("## 現在地", "## Work"), pattern: /one current section/ },
+      { content: content + "## 現在地\n", pattern: /one current section/ },
+      { content: content.replace(/\[Original\].*/, ""), pattern: /link to this document/ },
+      { content: content + "[Unsafe](../../outside.md)\n", pattern: /unsafe path/ },
+    ];
+    for (const { pattern, ...entry } of cases) {
+      const file = plan(root, [{ path: "docs/state.md", content, preserve: [keep], archiveSections: [range], ...entry }]);
+      const manifest = JSON.parse(fs.readFileSync(file)); manifest.id = id; fs.writeFileSync(file, JSON.stringify(manifest));
+      const before = snapshot(root);
+      const result = command(root, ["upgrade", "--plan", file, "--apply"]);
+      assert.equal(result.status, 2, result.stdout);
+      assert.match(result.stderr, pattern);
+      assert.deepEqual(snapshot(root), before);
+    }
+  });
   check("configuration, Agent definitions, traversal and backup symlinks are refused", () => {
     const root = fixture("unsafe");
     write(root, ".harness/config.toml", "custom\n");
