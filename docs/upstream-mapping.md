@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `082e296d271b817ce975a08fd837a7da4b84d95a` (Agentic Harness 0.6.2 source)
+- Current synchronized base: `1583208004a42f7070f56a11a8f8fc9d63f051ab` (Agentic Harness 0.6.2 source)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -182,7 +182,7 @@ scripts/check-windows-init.mjs
 
 ## 0.6.1 正式同期
 
-- 固定基点は `082e296d271b817ce975a08fd837a7da4b84d95a`（上流PR #16のmerge commit）。通常mergeし、上流全ファイル一覧をこのtreeへ更新した。削除はなく、Sprint 004の仕様補足・progress・feedback・release notes・state履歴を上流資産として追加した。
+- 固定基点は `1583208004a42f7070f56a11a8f8fc9d63f051ab`（上流PR #16のmerge commit）。通常mergeし、上流全ファイル一覧をこのtreeへ更新した。削除はなく、Sprint 004の仕様補足・progress・feedback・release notes・state履歴を上流資産として追加した。
 - managed本文、実装、templates、上流stateと履歴は固定SHAのbytesを保持し、既存のyasashii追加節と配布識別allowlistだけを合成した。
 - downstream所有READMEの競合はやさしいシリーズの説明を保持して解消し、0.6.1更新、修正対象と見送りの区別、単一現在地、本題復帰、旧global規則の移行案内を反映した。上流のpositioning検査・LICENSEには今回変更がなく、下流識別を維持した。
 - 既存overlayは修正対象と見送りの選別、現在地の置換更新、割込み後の元依頼への復帰を妨げない。model/effort設定とgrilling本文は変更しない。
