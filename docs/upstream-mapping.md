@@ -2,7 +2,7 @@
 
 - Upstream: `https://github.com/mtaiseeei/agentic-harness.git`
 - Initial base: `fb9c30375dac5d4458ed0f522b3469cff2f6b949`
-- Current synchronized base: `1542ce026e1ed4d5d08999edadf8111bb97ef21f` (Agentic Harness 0.6.1 source)
+- Current synchronized base: `082e296d271b817ce975a08fd837a7da4b84d95a` (Agentic Harness 0.6.2 source)
 - Downstream: `https://github.com/mtaiseeei/yasashii-harness.git`
 
 ## 対応方針
@@ -63,12 +63,14 @@ docs/progress/sprint-004-patch-001.md
 docs/progress/sprint-004-patch-002.md
 docs/progress/sprint-004-patch-003.md
 docs/progress/sprint-004.md
+docs/progress/state-history-archive.md
 docs/proposals/codex-custom-agent-routing.md
 docs/proposals/codex-model-routing.md
 docs/releases/v0.5.4-validation.md
 docs/releases/v0.5.5.md
 docs/releases/v0.6.0.md
 docs/releases/v0.6.1.md
+docs/releases/v0.6.2.md
 docs/spec.md
 docs/spec/constraints.md
 docs/spec/decisions.md
@@ -180,8 +182,13 @@ scripts/check-windows-init.mjs
 
 ## 0.6.1 正式同期
 
-- 固定基点は `1542ce026e1ed4d5d08999edadf8111bb97ef21f`（上流PR #16のmerge commit）。通常mergeし、上流全ファイル一覧をこのtreeへ更新した。削除はなく、Sprint 004の仕様補足・progress・feedback・release notes・state履歴を上流資産として追加した。
+- 固定基点は `082e296d271b817ce975a08fd837a7da4b84d95a`（上流PR #16のmerge commit）。通常mergeし、上流全ファイル一覧をこのtreeへ更新した。削除はなく、Sprint 004の仕様補足・progress・feedback・release notes・state履歴を上流資産として追加した。
 - managed本文、実装、templates、上流stateと履歴は固定SHAのbytesを保持し、既存のyasashii追加節と配布識別allowlistだけを合成した。
 - downstream所有READMEの競合はやさしいシリーズの説明を保持して解消し、0.6.1更新、修正対象と見送りの区別、単一現在地、本題復帰、旧global規則の移行案内を反映した。上流のpositioning検査・LICENSEには今回変更がなく、下流識別を維持した。
 - 既存overlayは修正対象と見送りの選別、現在地の置換更新、割込み後の元依頼への復帰を妨げない。model/effort設定とgrilling本文は変更しない。
 - source公開、installed更新、新sessionの実読込、利用repoへの適用は別工程として検証する。
+
+## v0.6.2 同期メモ
+
+- 確認済みstate履歴を原文保全付きで退避する修正を正式SHAから同期。yasashii追加節・配布識別・runtime設定は維持する。
+- downstream所有READMEは版・公開説明を更新。positioning検査とLICENSEは上流差分なし。実repo文書を公開fixtureへ含めない。
